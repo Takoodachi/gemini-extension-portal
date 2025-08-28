@@ -1,0 +1,45 @@
+{
+  "manifest_version": 3,
+  "name": "Gemini Portal",
+  "version": "1.0",
+  "description": "A floating chat portal for Gemini on every website.",
+  "permissions": [
+	  "storage"
+  ],
+  "host_permissions": ["https://*/*", "http://*/*", "https://generativelanguage.googleapis.com/*", "https://www.googleapis.com/customsearch/v1*"],
+  "content_scripts": [
+    {
+      "matches": ["<all_urls>"],
+      "js": ["env.js", "content.js"],
+      "css": ["styles.css"]
+    }
+  ],
+  "web_accessible_resources": [
+    {
+      "resources": [
+		"chatbox.html",
+		"chatbox.js",
+		"iframe-styles.css",
+		"chat-icon-light.png",
+		"chat-icon-dark.png",
+		"arrow-left-light.png",
+		"arrow-left-dark.png",
+		"settings-light.png",
+		"settings-dark.png",
+		"send-dark.png",
+        "send-light.png",
+		"upload-dark.png",
+        "upload-light.png",
+		"english.png",
+        "vietnamese.png",
+		"Lexend/static/*.ttf"
+	  ],
+      "matches": ["<all_urls>"]
+    }
+  ],
+  "icons": {
+    "16": "icon-16x16.png",
+    "32": "icon-32x32.png",
+    "96": "icon-96x96.png"
+  }
+}

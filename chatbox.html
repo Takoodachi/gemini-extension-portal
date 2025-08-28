@@ -1,0 +1,93 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <link rel="stylesheet" href="iframe-styles.css">
+</head>
+<body>
+    <div id="gemini-ui-container">
+        <div id="gemini-chat-ui">
+            <div id="gemini-chat-header">
+                <span data-key="geminiChat">Gemini Chat</span>
+                <button id="gemini-settings-button"><img id="settings-icon" src="settings-dark.png" alt="Settings"/></button>
+            </div>
+            <div id="gemini-chat-history"></div>
+            <div id="image-preview-container"></div>
+            <div id="gemini-input-area">
+				<input type="file" id="image-upload-input" accept="image/*" style="display: none;">
+				<button id="image-upload-button">
+					<img id="upload-icon" src="upload-dark.png" alt="Upload Image"/>
+				</button>
+				<div id="input-wrapper">
+					<textarea id="gemini-prompt-input" placeholder="Type your message..."></textarea>
+					<button id="gemini-send-button"><img id="send-icon" src="" alt="Send"/></button>
+				</div>
+			</div>
+        </div>
+
+        <div id="gemini-settings-ui">
+            <div id="gemini-settings-header">
+                <span data-key="settings">Settings</span>
+                <button id="gemini-back-button"><img id="back-icon" src="arrow-left-dark.png" alt="Back"/></button>
+            </div>
+            <div id="gemini-settings-content">
+                <div class="settings-section">
+                    <p class="settings-label" data-key="theme">Theme</p>
+                    <div class="theme-switcher">
+                        <div class="tabs">
+                            <input type="radio" id="radio-dark" name="theme" value="dark" checked>
+                            <label class="tab" for="radio-dark" data-key="dark">Dark</label>
+                            <input type="radio" id="radio-light" name="theme" value="light">
+                            <label class="tab" for="radio-light" data-key="light">Light</label>
+                            <span class="glider"></span>
+                        </div>
+                    </div>
+                </div>
+                <div class="settings-section">
+                    <p class="settings-label" data-key="chatboxSize">Chatbox Size</p>
+                    <div class="size-switcher">
+                        <div class="tabs">
+                            <input type="radio" id="radio-default" name="size" value="default" checked>
+                            <label class="tab" for="radio-default" data-key="default">Default</label>
+                            <input type="radio" id="radio-large" name="size" value="large">
+                            <label class="tab" for="radio-large" data-key="large">Large</label>
+                            <span class="glider"></span>
+                        </div>
+                    </div>
+                </div>
+				<div class="settings-section">
+                    <p class="settings-label" data-key="language">Language</p>
+                    <div class="select">
+                        <div class="selected" data-english="English" data-vietnamese="Vietnamese"></div>
+                        <div class="options">
+							<div title="English">
+								<input id="lang-en" name="language" type="radio" value="en" checked />
+								<label class="option" for="lang-en">
+									<img src="english.png" alt="English Flag"/>
+									<span data-txt="English"></span>
+								</label>
+							</div>
+							<div title="Vietnamese">
+								<input id="lang-vi" name="language" type="radio" value="vi" />
+								<label class="option" for="lang-vi">
+									<img src="vietnamese.png" alt="Vietnamese Flag"/>
+									<span data-txt="Vietnamese"></span>
+								</label>
+							</div>
+						</div>
+                    </div>
+                </div>
+                <div class="settings-section">
+                    <p class="settings-label" data-key="rememberChoice">Remember my choice</p>
+                    <label class="switch">
+                        <input type="checkbox" id="persist-settings-checkbox">
+                        <span class="slider"></span>
+                    </label>
+                </div>
+                <button id="clear-chat-button" class="settings-button" data-key="clearChat">Clear Chat History</button>
+            </div>
+        </div>
+    </div>
+    <script src="chatbox.js"></script>
+</body>
+</html>

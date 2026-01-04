@@ -4,9 +4,26 @@
   "version": "1.0",
   "description": "A floating chat portal for Gemini on every website.",
   "permissions": [
-	  "storage"
+    "storage"
   ],
-  "host_permissions": ["https://*/*", "http://*/*", "https://generativelanguage.googleapis.com/*", "https://www.googleapis.com/customsearch/v1*"],
+  "host_permissions": [
+    "https://*/*", 
+    "http://*/*", 
+    "https://generativelanguage.googleapis.com/*", 
+    "https://www.googleapis.com/customsearch/v1*"
+  ],
+  "background": {
+    "service_worker": "background.js"
+  },
+  "commands": {
+    "toggle-feature": {
+      "suggested_key": {
+        "default": "Ctrl+Shift+Y",
+        "mac": "Command+Shift+Y"
+      },
+      "description": "Toggle Gemini Portal On/Off"
+    }
+  },
   "content_scripts": [
     {
       "matches": ["<all_urls>"],
@@ -17,23 +34,23 @@
   "web_accessible_resources": [
     {
       "resources": [
-		"chatbox.html",
-		"chatbox.js",
-		"iframe-styles.css",
-		"chat-icon-light.png",
-		"chat-icon-dark.png",
-		"arrow-left-light.png",
-		"arrow-left-dark.png",
-		"settings-light.png",
-		"settings-dark.png",
-		"send-dark.png",
+        "chatbox.html",
+        "chatbox.js",
+        "iframe-styles.css",
+        "chat-icon-light.png",
+        "chat-icon-dark.png",
+        "arrow-left-light.png",
+        "arrow-left-dark.png",
+        "settings-light.png",
+        "settings-dark.png",
+        "send-dark.png",
         "send-light.png",
-		"upload-dark.png",
+        "upload-dark.png",
         "upload-light.png",
-		"english.png",
+        "english.png",
         "vietnamese.png",
-		"Lexend/static/*.ttf"
-	  ],
+        "Lexend/static/*.ttf"
+      ],
       "matches": ["<all_urls>"]
     }
   ],

@@ -1,4 +1,4 @@
-// --- Helper Functions ---
+// Helper Functions
 function simpleMarkdownToHtml(text) {
     let html = text.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
     html = html.replace(/\*(.*?)\*/g, '<em>$1</em>');
@@ -6,7 +6,7 @@ function simpleMarkdownToHtml(text) {
     return html;
 }
 
-// --- Main script execution after the DOM is ready ---
+// Main script execution after the DOM is ready
 window.addEventListener('DOMContentLoaded', () => {
     const iFrameBody = document.body;
     const uiContainer = document.getElementById('gemini-ui-container');
@@ -27,9 +27,14 @@ window.addEventListener('DOMContentLoaded', () => {
     const imageUploadButton = document.getElementById('image-upload-button');
     const imageUploadInput = document.getElementById('image-upload-input');
     const imagePreviewContainer = document.getElementById('image-preview-container');
+	const confirmationModal = document.getElementById('confirmation-modal');
+    const confirmYesBtn = document.getElementById('confirm-yes');
+    const confirmNoBtn = document.getElementById('confirm-no');
+	const successModal = document.getElementById('success-modal');
+    const successOkBtn = document.getElementById('success-ok');
     let uploadedImageData = null;
 
-    // --- Translation Strings ---
+    // Translation Strings
     const translations = {
         en: {
             geminiChat: "Gemini Chat",
@@ -47,7 +52,9 @@ window.addEventListener('DOMContentLoaded', () => {
             welcomeMessage: "Hello! 👋 How can I help you today?",
             clearConfirm: "Are you sure you want to clear the entire chat history?",
             typeMessage: "Type your message...",
-            sources: "Sources:"
+            sources: "Sources:",
+			chatCleared: "Chat history cleared!",
+            ok: "OK"
         },
         vi: {
             geminiChat: "Trò chuyện Gemini",
@@ -65,12 +72,14 @@ window.addEventListener('DOMContentLoaded', () => {
             welcomeMessage: "Xin chào! 👋 Tôi có thể giúp gì cho bạn?",
             clearConfirm: "Bạn có chắc chắn muốn xóa toàn bộ lịch sử trò chuyện không?",
             typeMessage: "Nhập tin nhắn của bạn...",
-            sources: "Nguồn:"
+            sources: "Nguồn:",
+			chatCleared: "Đã xóa lịch sử trò chuyện!",
+            ok: "OK"
         }
     };
     let currentLang = 'en';
 
-    // --- Language & UI Text Logic ---
+    // Language & UI Text Logic
     function applyLanguage(lang) {
 		currentLang = lang;
 		document.querySelectorAll('[data-key]').forEach(el => {
@@ -90,7 +99,7 @@ window.addEventListener('DOMContentLoaded', () => {
 		window.parent.postMessage({ type: 'LANGUAGE_CHANGED', lang: lang }, '*');
 	}
 
-    // --- Theme & Size Logic ---
+    // Theme & Size Logic
     function applyTheme(theme) {
         if (theme === 'light') {
             iFrameBody.classList.add('light-theme');
@@ -180,7 +189,7 @@ window.addEventListener('DOMContentLoaded', () => {
 
     persistCheckbox.addEventListener('change', saveSettings);
 
-    // --- Image Upload & Paste Logic ---
+    // Image Upload & Paste Logic
     imageUploadButton.addEventListener('click', () => { imageUploadInput.click(); });
     imageUploadInput.addEventListener('change', (event) => {
         const file = event.target.files[0];
@@ -221,7 +230,7 @@ window.addEventListener('DOMContentLoaded', () => {
         imageUploadInput.value = '';
     }
 
-    // --- Helper function that needs access to chatHistoryDiv ---
+    // Helper function that needs access to chatHistoryDiv
     function addMessage(text, sender, imageData = null, citations = null) {
 		const messageDiv = document.createElement('div');
 		messageDiv.classList.add('gemini-message');
@@ -297,7 +306,7 @@ window.addEventListener('DOMContentLoaded', () => {
         if (loader) { chatHistoryDiv.removeChild(loader); }
     }
 
-    // --- Communication with content.js ---
+    // Communication with content.js
     function sendMessageToParent(prompt, imageData) {
         window.parent.postMessage({ type: 'GEMINI_PROMPT', text: prompt, imageData: imageData }, '*');
     }
@@ -305,6 +314,41 @@ window.addEventListener('DOMContentLoaded', () => {
     window.addEventListener('message', (event) => {
         if (event.source !== window.parent) return;
         const message = event.data;
+		
+		if (message.type === 'RESTORE_HISTORY') {
+            // Clear existing messages (except maybe settings/welcome if desired, but cleaner to wipe)
+            chatHistoryDiv.innerHTML = '';
+            
+            // Add back the Welcome Message and Date
+            addDateLine();
+            addMessage(translations[currentLang].welcomeMessage, 'gemini');
+
+            // Loop through history and re-render
+            message.history.forEach(item => {
+                if (item.role === 'user') {
+                    // Extract text
+                    const textPart = item.parts.find(p => p.text);
+                    const text = textPart ? textPart.text : null;
+
+                    // Extract image
+                    const imgPart = item.parts.find(p => p.inline_data);
+                    const imgData = imgPart ? `data:${imgPart.inline_data.mime_type};base64,${imgPart.inline_data.data}` : null;
+                    
+                    if (text || imgData) {
+                        addMessage(text, 'user', imgData);
+                    }
+                } else if (item.role === 'model') {
+                    // Extract text (ignore function calls in UI restoration for now)
+                    const textPart = item.parts.find(p => p.text);
+                    if (textPart) {
+                        addMessage(textPart.text, 'gemini');
+                    }
+                }
+            });
+            // Scroll to bottom
+            chatHistoryDiv.scrollTop = chatHistoryDiv.scrollHeight;
+        }
+		
         if (message.type === 'GEMINI_RESPONSE') {
             removeLoader();
             addMessage(message.text, 'gemini', null, message.groundingMetadata);
@@ -316,13 +360,13 @@ window.addEventListener('DOMContentLoaded', () => {
         }
     });
 
-    // --- Textarea Resize Logic ---
+    // Textarea Resize Logic
     function resizeTextarea() {
         promptInput.style.height = '38px';
         promptInput.style.height = `${promptInput.scrollHeight}px`;
     }
 
-    // --- Event Listeners ---
+    // Event Listeners
     function handleSend() {
         const userPrompt = promptInput.value.trim();
         if (userPrompt === '' && !uploadedImageData) return;
@@ -344,20 +388,50 @@ window.addEventListener('DOMContentLoaded', () => {
     });
     promptInput.addEventListener('input', resizeTextarea);
 
-    // --- UI Navigation Logic ---
+    // UI Navigation Logic
     settingsButton.addEventListener('click', () => { uiContainer.classList.add('settings-active'); });
     backButton.addEventListener('click', () => { uiContainer.classList.remove('settings-active'); });
 
-    // --- Clear Chat Logic ---
+    // Clear Chat Logic
     clearChatButton.addEventListener('click', () => {
-        const isConfirmed = window.confirm(translations[currentLang].clearConfirm);
-        if (isConfirmed) {
-            chatHistoryDiv.innerHTML = '';
-            addMessage(translations[currentLang].welcomeMessage, 'gemini');
-            window.parent.postMessage({ type: 'CLEAR_CHAT_HISTORY' }, '*');
+        // Show modal
+        confirmationModal.classList.remove('hidden');
+    });
+
+    // Modal Action Listeners
+    confirmYesBtn.addEventListener('click', () => {
+        // Perform clear action
+        chatHistoryDiv.innerHTML = '';
+        addMessage(translations[currentLang].welcomeMessage, 'gemini');
+        window.parent.postMessage({ type: 'CLEAR_CHAT_HISTORY' }, '*');
+        
+        // Hide confirmation modal
+        confirmationModal.classList.add('hidden');
+		
+		// Show success modal
+        successModal.classList.remove('hidden');
+    });
+
+    confirmNoBtn.addEventListener('click', () => {
+        confirmationModal.classList.add('hidden');
+    });
+	
+	successOkBtn.addEventListener('click', () => {
+        successModal.classList.add('hidden');
+    });
+	
+	successModal.addEventListener('click', (e) => {
+        if (e.target === successModal) {
+            successModal.classList.add('hidden');
         }
     });
 
-    // --- Initial Actions ---
+    confirmationModal.addEventListener('click', (e) => {
+        if (e.target === confirmationModal) {
+            confirmationModal.classList.add('hidden');
+        }
+    });
+
+    // Initial Actions
     loadSettings();
 });

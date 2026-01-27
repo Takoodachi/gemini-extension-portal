@@ -1,26 +1,24 @@
 (function() {
-    // Prevent multiple injections, but allow toggling
     if (window.hasRunGeminiPortal) return;
     window.hasRunGeminiPortal = true;
 
-    // --- State Variables ---
+    // State Variables
     let container = null;
     let floatingButton = null;
     let chatIframe = null;
     let chatHistory = [];
     let currentLanguage = 'en';
     
-    // --- Event Listener References (Need these to remove them properly) ---
+    // Event Listener References
     let handleDragMove = null;
     let handleDragEnd = null;
     let handleDocClick = null;
     let handleWindowMessage = null;
 
-    // --- Logic to Enable (Create UI) ---
+    // Logic to Enable (Create UI)
     function enableFeature() {
-        if (container) return; // Already enabled
+        if (container) return; 
 
-        // 1. Create UI Shell
         container = document.createElement('div');
         container.id = 'gemini-chatbox-container';
         container.classList.add('bottom-right');
@@ -44,13 +42,25 @@
         chatIframe.src = chrome.runtime.getURL('chatbox.html');
         container.appendChild(chatIframe);
 
+        chatIframe.addEventListener('load', () => {
+            chrome.storage.session.get("chatHistory", (data) => {
+                if (data.chatHistory) {
+                    chatHistory = data.chatHistory;
+                    chatIframe.contentWindow.postMessage({ 
+                        type: 'RESTORE_HISTORY', 
+                        history: chatHistory 
+                    }, '*');
+                }
+            });
+        });
+
         chatIframe.addEventListener('transitionend', (event) => {
             if (event.propertyName === 'width') {
                 chatIframe.contentWindow.postMessage({ type: 'IFRAME_RESIZED' }, '*');
             }
         });
 
-        // 2. Setup Drag & Drop Logic
+        // Setup Drag & Drop Logic
         let isDragging = false;
         let hasDragged = false;
         let wasVisibleOnDragStart = false;
@@ -65,41 +75,116 @@
             initialMouseX = e.clientX;
             initialMouseY = e.clientY;
             floatingButton.style.cursor = 'grabbing';
-
             wasVisibleOnDragStart = chatIframe.classList.contains('gemini-iframe-visible');
-            if (wasVisibleOnDragStart) {
-                chatIframe.classList.remove('gemini-iframe-visible');
-            }
+            if (wasVisibleOnDragStart) chatIframe.classList.remove('gemini-iframe-visible');
         });
 
-        // Define named functions for document listeners so we can remove them later
         handleDragMove = (e) => {
             if (!isDragging) return;
             const dx = e.clientX - initialMouseX;
             const dy = e.clientY - initialMouseY;
             if (Math.abs(dx) > 5 || Math.abs(dy) > 5) { hasDragged = true; }
-            container.style.transform = `translate(${offsetX + dx}px, ${offsetY + dy}px)`;
+            
+            // Calculate new position
+            let newX = offsetX + dx;
+            let newY = offsetY + dy;
+            
+            // Apply transform to get actual position
+            container.style.transform = `translate(${newX}px, ${newY}px)`;
+            
+            // Get actual container position after transform
+            const containerRect = container.getBoundingClientRect();
+            const viewportWidth = window.innerWidth;
+            const viewportHeight = window.innerHeight;
+            
+            // Constrain to viewport boundaries
+            let constrainedX = newX;
+            let constrainedY = newY;
+            
+            // If container goes outside left edge, constrain it
+            if (containerRect.left < 0) {
+                constrainedX = newX - containerRect.left;
+            }
+            // If container goes outside right edge, constrain it
+            if (containerRect.right > viewportWidth) {
+                constrainedX = newX - (containerRect.right - viewportWidth);
+            }
+            // If container goes outside top edge, constrain it
+            if (containerRect.top < 0) {
+                constrainedY = newY - containerRect.top;
+            }
+            // If container goes outside bottom edge, constrain it
+            if (containerRect.bottom > viewportHeight) {
+                constrainedY = newY - (containerRect.bottom - viewportHeight);
+            }
+            
+            // Apply constrained position
+            container.style.transform = `translate(${constrainedX}px, ${constrainedY}px)`;
         };
 
         handleDragEnd = (e) => {
             if (isDragging) {
                 isDragging = false;
-                container.style.transition = 'transform 0.2s ease-out';
                 floatingButton.style.cursor = 'grab';
                 const dx = e.clientX - initialMouseX;
                 const dy = e.clientY - initialMouseY;
-                offsetX += dx;
-                offsetY += dy;
-
+                let newOffsetX = offsetX + dx;
+                let newOffsetY = offsetY + dy;
+                
+                // Constrain final position to viewport boundaries
+                container.style.transform = `translate(${newOffsetX}px, ${newOffsetY}px)`;
+                const containerRect = container.getBoundingClientRect();
+                const viewportWidth = window.innerWidth;
+                const viewportHeight = window.innerHeight;
+                
+                // Adjust if outside boundaries
+                if (containerRect.left < 0) {
+                    newOffsetX = newOffsetX - containerRect.left;
+                }
+                if (containerRect.right > viewportWidth) {
+                    newOffsetX = newOffsetX - (containerRect.right - viewportWidth);
+                }
+                if (containerRect.top < 0) {
+                    newOffsetY = newOffsetY - containerRect.top;
+                }
+                if (containerRect.bottom > viewportHeight) {
+                    newOffsetY = newOffsetY - (containerRect.bottom - viewportHeight);
+                }
+                
                 if (hasDragged) {
-                    updateQuadrantClass();
-                    if (wasVisibleOnDragStart) {
-                        toggleChatbox();
+                    const snapResult = snapToEdges(newOffsetX, newOffsetY);
+                    offsetX = snapResult.x;
+                    offsetY = snapResult.y;
+                    
+                    container.style.transform = `translate(${offsetX}px, ${offsetY}px)`;
+                    const snappedRect = container.getBoundingClientRect();
+                    if (snappedRect.left < 0) {
+                        offsetX = offsetX - snappedRect.left;
                     }
+                    if (snappedRect.right > viewportWidth) {
+                        offsetX = offsetX - (snappedRect.right - viewportWidth);
+                    }
+                    if (snappedRect.top < 0) {
+                        offsetY = offsetY - snappedRect.top;
+                    }
+                    if (snappedRect.bottom > viewportHeight) {
+                        offsetY = offsetY - (snappedRect.bottom - viewportHeight);
+                    }
+                    
+                    container.style.transition = 'transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1)';
+                    container.style.transform = `translate(${offsetX}px, ${offsetY}px)`;
+                    
+                    setTimeout(() => {
+                        updateQuadrantClass();
+                        container.style.transition = 'transform 0.2s ease-out';
+                    }, 300);
+                    
+                    if (wasVisibleOnDragStart) toggleChatbox();
                 } else {
-                    if (!wasVisibleOnDragStart) {
-                        toggleChatbox();
-                    }
+                    offsetX = newOffsetX;
+                    offsetY = newOffsetY;
+                    container.style.transition = 'transform 0.2s ease-out';
+                    if (!wasVisibleOnDragStart) toggleChatbox();
                 }
             }
         };
@@ -111,12 +196,11 @@
             if (isChatVisible && isClickOutside) { toggleChatbox(); }
         };
 
-        // Attach listeners
         document.addEventListener('mousemove', handleDragMove);
         document.addEventListener('mouseup', handleDragEnd);
         document.addEventListener('click', handleDocClick);
 
-        // 3. Setup Message Handling (Logic)
+        // Setup Message Handling
         handleWindowMessage = async (event) => {
             if (!chatIframe || event.source !== chatIframe.contentWindow) return;
             const message = event.data;
@@ -141,13 +225,14 @@
             }
             if (message.type === 'CLEAR_CHAT_HISTORY') {
                 chatHistory = [];
+                // Clear storage
+                chrome.storage.session.remove("chatHistory");
                 return;
             }
             if (message.type === 'TOGGLE_CHATBOX') {
                 toggleChatbox();
             }
             if (message.type === 'GEMINI_PROMPT') {
-                // ... (Your existing API logic) ...
                 handleGeminiPrompt(message);
             }
         };
@@ -155,27 +240,34 @@
         window.addEventListener('message', handleWindowMessage);
     }
 
-    // --- Logic to Disable (Remove UI) ---
+    // Logic to Disable (Remove UI)
     function disableFeature() {
-        if (!container) return; // Already disabled
-
-        // 1. Remove Listeners
+        if (!container) return;
         if (handleDragMove) document.removeEventListener('mousemove', handleDragMove);
         if (handleDragEnd) document.removeEventListener('mouseup', handleDragEnd);
         if (handleDocClick) document.removeEventListener('click', handleDocClick);
         if (handleWindowMessage) window.removeEventListener('message', handleWindowMessage);
-
-        // 2. Remove DOM Elements
         container.remove();
-
-        // 3. Clean up variables
         container = null;
         floatingButton = null;
         chatIframe = null;
-        chatHistory = []; // Reset history for a fresh start next time
+
     }
 
-    // --- Helper Functions (Reused from your code) ---
+    // Listen for Storage Changes (Sync across tabs)
+    chrome.storage.onChanged.addListener((changes, namespace) => {
+        if (namespace === 'session' && changes.chatHistory) {
+            chatHistory = changes.chatHistory.newValue || [];
+            if (chatIframe) {
+                chatIframe.contentWindow.postMessage({ 
+                    type: 'RESTORE_HISTORY', 
+                    history: chatHistory 
+                }, '*');
+            }
+        }
+    });
+
+    // Helper Functions
     function updateQuadrantClass() {
         if (!container) return;
         const rect = container.getBoundingClientRect();
@@ -190,11 +282,46 @@
         else { container.classList.add('bottom-right'); }
     }
 
+    // Snap-to-Edges Function
+    function snapToEdges(currentX, currentY) {
+        if (!container) return { x: currentX, y: currentY };
+        
+        const rect = container.getBoundingClientRect();
+        const snapThreshold = 100;
+        const edgeMargin = 20;
+        
+        const windowWidth = window.innerWidth;
+        const windowHeight = window.innerHeight;
+        
+        let snapX = currentX;
+        let snapY = currentY;
+        let snapped = false;
+
+        if (rect.left < snapThreshold + edgeMargin) {
+            snapX = currentX - (rect.left - edgeMargin);
+            snapped = true;
+        } 
+        else if (rect.right > windowWidth - (snapThreshold + edgeMargin)) {
+            snapX = currentX + (windowWidth - rect.right - edgeMargin);
+            snapped = true;
+        }
+
+        if (rect.top < snapThreshold + edgeMargin) {
+            snapY = currentY - (rect.top - edgeMargin);
+            snapped = true;
+        } 
+        else if (rect.bottom > windowHeight - (snapThreshold + edgeMargin)) {
+            snapY = currentY + (windowHeight - rect.bottom - edgeMargin);
+            snapped = true;
+        }
+        
+        return { x: snapX, y: snapY, snapped: snapped };
+    }
+
     function toggleChatbox() { 
         if(chatIframe) chatIframe.classList.toggle('gemini-iframe-visible'); 
     }
 
-    // (Extracted your API logic into a function to keep code clean)
     async function handleGeminiPrompt(message) {
         const userPrompt = message.text;
         const userImageData = message.imageData;
@@ -205,13 +332,13 @@
         if (userPrompt) { userParts.push({ text: userPrompt }); }
 
         chatHistory.push({ role: "user", parts: userParts });
+        chrome.storage.session.set({ chatHistory: chatHistory });
 
         try {
             const result = await callGeminiApi(chatHistory);
             let modelResponseCandidate = result.candidates?.[0];
 
             if (!modelResponseCandidate) {
-               // ... error handling
                sendError("The model's response was blocked.");
                return;
             }
@@ -234,6 +361,8 @@
 
             if (geminiResponseText) {
                 chatHistory.push({ role: "model", parts: [{ text: geminiResponseText }] });
+                chrome.storage.session.set({ chatHistory: chatHistory });
+
                 chatIframe.contentWindow.postMessage({
                     type: 'GEMINI_RESPONSE',
                     text: geminiResponseText,
@@ -253,7 +382,7 @@
         if (chatIframe) chatIframe.contentWindow.postMessage({ type: 'GEMINI_ERROR', text: text }, '*');
     }
 
-    // --- API Functions (Using your env.js keys) ---
+    // API Functions
     async function callGeminiApi(history, toolOutputs = null) {
         const GEMINI_API_URL = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=" + GEMINI_API_KEY;
         const currentDate = new Date();
@@ -300,23 +429,15 @@
         } catch (error) { return { error: error.message }; }
     }
 
-
-    // --- Initialization Listeners ---
-    
-    // 1. Listen for Toggle Messages from Background
+    // Initialization
     chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
         if (request.action === "toggleState") {
-            if (request.enabled) {
-                enableFeature();
-            } else {
-                disableFeature();
-            }
+            if (request.enabled) enableFeature();
+            else disableFeature();
         }
     });
 
-    // 2. Initial Check on Page Load
     chrome.storage.local.get("isEnabled", (data) => {
-        // Default to true if not set
         if (data.isEnabled === undefined || data.isEnabled === true) {
             enableFeature();
         }

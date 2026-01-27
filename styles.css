@@ -29,7 +29,6 @@
   border-radius: 50%;
 }
 
-/* Iframe base styles and animation */
 #gemini-chat-iframe {
   width: 350px;
   height: 550px;
@@ -37,7 +36,7 @@
   border-radius: 12px;
   box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
   position: absolute;
-  transition: opacity 0.2s ease-out, transform 0.2s ease-out, width 0.3s ease-in-out;
+  transition: opacity 0.3s ease-in-out, transform 0.2s ease-out, width 0.3s ease-in-out;
   opacity: 0;
   transform: scale(0.95);
   pointer-events: none;
@@ -48,7 +47,13 @@
   pointer-events: auto;
 }
 
-/* Quadrant-specific positioning */
+#gemini-chatbox-container:not(:hover) #gemini-chat-iframe.gemini-iframe-visible {
+  opacity: 0.4;
+}
+#gemini-chatbox-container:hover #gemini-chat-iframe.gemini-iframe-visible {
+  opacity: 1;
+}
+
 #gemini-chatbox-container.bottom-right #gemini-chat-iframe { bottom: 60px; right: 0; transform-origin: bottom right; }
 #gemini-chatbox-container.bottom-left #gemini-chat-iframe { bottom: 60px; left: 0; transform-origin: bottom left; }
 #gemini-chatbox-container.top-left #gemini-chat-iframe { top: 60px; left: 0; transform-origin: top left; }

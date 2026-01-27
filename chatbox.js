@@ -316,21 +316,16 @@ window.addEventListener('DOMContentLoaded', () => {
         const message = event.data;
 		
 		if (message.type === 'RESTORE_HISTORY') {
-            // Clear existing messages (except maybe settings/welcome if desired, but cleaner to wipe)
             chatHistoryDiv.innerHTML = '';
             
-            // Add back the Welcome Message and Date
             addDateLine();
             addMessage(translations[currentLang].welcomeMessage, 'gemini');
 
-            // Loop through history and re-render
             message.history.forEach(item => {
                 if (item.role === 'user') {
-                    // Extract text
                     const textPart = item.parts.find(p => p.text);
                     const text = textPart ? textPart.text : null;
 
-                    // Extract image
                     const imgPart = item.parts.find(p => p.inline_data);
                     const imgData = imgPart ? `data:${imgPart.inline_data.mime_type};base64,${imgPart.inline_data.data}` : null;
                     
@@ -338,14 +333,12 @@ window.addEventListener('DOMContentLoaded', () => {
                         addMessage(text, 'user', imgData);
                     }
                 } else if (item.role === 'model') {
-                    // Extract text (ignore function calls in UI restoration for now)
                     const textPart = item.parts.find(p => p.text);
                     if (textPart) {
                         addMessage(textPart.text, 'gemini');
                     }
                 }
             });
-            // Scroll to bottom
             chatHistoryDiv.scrollTop = chatHistoryDiv.scrollHeight;
         }
 		
@@ -392,23 +385,17 @@ window.addEventListener('DOMContentLoaded', () => {
     settingsButton.addEventListener('click', () => { uiContainer.classList.add('settings-active'); });
     backButton.addEventListener('click', () => { uiContainer.classList.remove('settings-active'); });
 
-    // Clear Chat Logic
     clearChatButton.addEventListener('click', () => {
-        // Show modal
         confirmationModal.classList.remove('hidden');
     });
 
     // Modal Action Listeners
     confirmYesBtn.addEventListener('click', () => {
-        // Perform clear action
         chatHistoryDiv.innerHTML = '';
         addMessage(translations[currentLang].welcomeMessage, 'gemini');
         window.parent.postMessage({ type: 'CLEAR_CHAT_HISTORY' }, '*');
         
-        // Hide confirmation modal
         confirmationModal.classList.add('hidden');
-		
-		// Show success modal
         successModal.classList.remove('hidden');
     });
 

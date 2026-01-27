@@ -64,6 +64,9 @@ html, body {
     height: 100%;
     display: flex;
     transition: transform 0.3s ease-in-out;
+    background-color: var(--background-primary);
+    border-radius: 12px;
+    overflow: hidden;
 }
 #gemini-ui-container.settings-active {
     transform: translateX(-50%);
@@ -75,10 +78,10 @@ html, body {
   width: 50%;
   height: 100%;
   background-color: var(--background-primary);
-  border-radius: 12px;
   display: flex;
   flex-direction: column;
   overflow: hidden;
+  flex-shrink: 0;
 }
 
 /* Headers */

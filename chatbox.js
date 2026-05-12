@@ -1,4 +1,4 @@
-// ─── XSS & Markdown ──────────────────────────────────────────────────────────
+// XSS & Markdown
 
 function escapeHtml(text) {
     const map = { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#039;' };
@@ -88,13 +88,14 @@ function simpleMarkdownToHtml(text) {
     return html;
 }
 
-// ─── Translations ─────────────────────────────────────────────────────────────
+// Translations
 
 const TRANSLATIONS = {
     en: {
         geminiChat: "Gemini Chat", settings: "Settings", send: "Send",
         language: "Language", theme: "Theme", dark: "Dark", light: "Light",
         chatboxSize: "Chatbox Size", default: "Default", large: "Large",
+        autoExpand: "Auto-expand on long text",
         rememberChoice: "Remember my choice", clearChat: "Clear Chat History",
         exportChat: "Export Chat",
         welcomeMessage: "Hello! 👋 How can I help you today?",
@@ -108,6 +109,7 @@ const TRANSLATIONS = {
         geminiChat: "Trò chuyện Gemini", settings: "Cài đặt", send: "Gửi",
         language: "Ngôn ngữ", theme: "Giao diện", dark: "Tối", light: "Sáng",
         chatboxSize: "Kích thước", default: "Mặc định", large: "Lớn",
+        autoExpand: "Tự động mở rộng khi văn bản dài",
         rememberChoice: "Ghi nhớ lựa chọn", clearChat: "Xóa lịch sử trò chuyện",
         exportChat: "Xuất đoạn chat",
         welcomeMessage: "Xin chào! 👋 Tôi có thể giúp gì cho bạn?",
@@ -122,7 +124,7 @@ const TRANSLATIONS = {
 const MAX_IMAGE_SIZE_MB = 5;
 const MAX_IMAGE_SIZE_BYTES = MAX_IMAGE_SIZE_MB * 1024 * 1024;
 
-// ─── AppState ─────────────────────────────────────────────────────────────────
+// AppState
 
 class AppState {
     constructor() {
@@ -130,10 +132,11 @@ class AppState {
         this.uploadedImageData = null;
         this.isWaitingForResponse = false;
         this.isDictating = false;
+        this.autoExpand = true;
     }
 }
 
-// ─── UIManager ────────────────────────────────────────────────────────────────
+// UIManager
 
 class UIManager {
     constructor(state, chatManager) {
@@ -365,7 +368,7 @@ class UIManager {
     }
 }
 
-// ─── ChatManager ──────────────────────────────────────────────────────────────
+// ChatManager
 
 class ChatManager {
     constructor(state) {
@@ -426,6 +429,16 @@ class ChatManager {
 
     _fillResponseDiv(div, text, citations, formattedTime, isError) {
         div.innerHTML = simpleMarkdownToHtml(text);
+
+        // Auto-expand logic
+        if (this.state.autoExpand && text && text.length > 800) {
+            const largeRadio = document.querySelector('input[name="size"][value="large"]');
+            if (largeRadio && !largeRadio.checked) {
+                largeRadio.checked = true;
+                // We need to trigger the size change via window.parent or SettingsManager
+                window.parent.postMessage({ type: 'SIZE_CHANGED', size: 'large' }, '*');
+            }
+        }
 
         if (!isError) {
             const actionsRow = document.createElement('div');
@@ -500,7 +513,7 @@ class ChatManager {
         div.appendChild(timestampDiv);
     }
 
-    // ── Streaming ──
+    // Streaming
 
     startStreamMessage() {
         this.removeLoader();
@@ -608,7 +621,7 @@ class ChatManager {
     }
 }
 
-// ─── SettingsManager ──────────────────────────────────────────────────────────
+// SettingsManager
 
 class SettingsManager {
     constructor(state, uiManager, chatManager, ipcManager) {
@@ -620,6 +633,7 @@ class SettingsManager {
         this.sizeRadios = document.querySelectorAll('input[name="size"]');
         this.langRadios = document.querySelectorAll('input[name="language"]');
         this.persistCheckbox = document.getElementById('persist-settings-checkbox');
+        this.autoExpandCheckbox = document.getElementById('auto-expand-checkbox');
         this.bindEvents();
     }
 
@@ -628,6 +642,10 @@ class SettingsManager {
         this.sizeRadios.forEach(r => r.addEventListener('change', () => { this.applySize(r.value); this.saveSettings(); }));
         this.langRadios.forEach(r => r.addEventListener('change', () => { this.applyLanguage(r.value); this.saveSettings(); }));
         this.persistCheckbox.addEventListener('change', () => this.saveSettings());
+        this.autoExpandCheckbox.addEventListener('change', (e) => { 
+            this.state.autoExpand = e.target.checked; 
+            this.saveSettings(); 
+        });
     }
 
     applyLanguage(lang) {
@@ -652,19 +670,29 @@ class SettingsManager {
         if (persist) {
             const currentTheme = document.body.classList.contains('light-theme') ? 'light' : 'dark';
             const currentSize = document.querySelector('input[name="size"]:checked').value;
-            chrome.storage.local.set({ theme: currentTheme, size: currentSize, language: this.state.currentLang, persistSettings: true });
+            chrome.storage.local.set({ 
+                theme: currentTheme, 
+                size: currentSize, 
+                language: this.state.currentLang, 
+                autoExpand: this.state.autoExpand,
+                persistSettings: true 
+            });
         } else {
-            chrome.storage.local.remove(['theme', 'size', 'language', 'persistSettings']);
+            chrome.storage.local.remove(['theme', 'size', 'language', 'autoExpand', 'persistSettings']);
         }
     }
 
     loadSettings() {
-        chrome.storage.local.get(['theme', 'size', 'language', 'persistSettings'], result => {
+        chrome.storage.local.get(['theme', 'size', 'language', 'autoExpand', 'persistSettings'], result => {
             if (result.persistSettings) {
                 this.persistCheckbox.checked = true;
                 this.applyTheme(result.theme || 'dark');
                 this.applySize(result.size || 'default');
                 this.applyLanguage(result.language || 'en');
+                if (result.autoExpand !== undefined) {
+                    this.state.autoExpand = result.autoExpand;
+                    this.autoExpandCheckbox.checked = result.autoExpand;
+                }
             } else {
                 this.applyTheme('dark');
                 this.applySize('default');
@@ -676,7 +704,7 @@ class SettingsManager {
     }
 }
 
-// ─── IpcManager ───────────────────────────────────────────────────────────────
+// IpcManager
 
 class IpcManager {
     constructor(uiManager, chatManager) {
@@ -735,7 +763,7 @@ class IpcManager {
     sendSizeChange(size) { window.parent.postMessage({ type: 'SIZE_CHANGED', size }, '*'); }
 }
 
-// ─── Init ─────────────────────────────────────────────────────────────────────
+// Init
 
 window.addEventListener('DOMContentLoaded', () => {
     const state = new AppState();

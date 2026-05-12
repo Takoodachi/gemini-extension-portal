@@ -40,61 +40,79 @@
                 <button id="gemini-back-button"><img id="back-icon" src="arrow-left-dark.png" alt="Back"/></button>
             </div>
             <div id="gemini-settings-content">
-                <div class="settings-section">
-                    <p class="settings-label" data-key="theme">Theme</p>
-                    <div class="theme-switcher">
-                        <div class="tabs">
-                            <input type="radio" id="radio-dark" name="theme" value="dark" checked>
-                            <label class="tab" for="radio-dark" data-key="dark">Dark</label>
-                            <input type="radio" id="radio-light" name="theme" value="light">
-                            <label class="tab" for="radio-light" data-key="light">Light</label>
-                            <span class="glider"></span>
-                        </div>
-                    </div>
-                </div>
-                <div class="settings-section">
-                    <p class="settings-label" data-key="chatboxSize">Chatbox Size</p>
-                    <div class="size-switcher">
-                        <div class="tabs">
-                            <input type="radio" id="radio-default" name="size" value="default" checked>
-                            <label class="tab" for="radio-default" data-key="default">Default</label>
-                            <input type="radio" id="radio-large" name="size" value="large">
-                            <label class="tab" for="radio-large" data-key="large">Large</label>
-                            <span class="glider"></span>
-                        </div>
-                    </div>
-                </div>
-                <div class="settings-section">
-                    <p class="settings-label" data-key="language">Language</p>
-                    <div class="select">
-                        <div class="selected" data-english="English" data-vietnamese="Vietnamese"></div>
-                        <div class="options">
-                            <div title="English">
-                                <input id="lang-en" name="language" type="radio" value="en" checked />
-                                <label class="option" for="lang-en">
-                                    <img src="english.png" alt="English Flag"/>
-                                    <span data-txt="English"></span>
-                                </label>
-                            </div>
-                            <div title="Vietnamese">
-                                <input id="lang-vi" name="language" type="radio" value="vi" />
-                                <label class="option" for="lang-vi">
-                                    <img src="vietnamese.png" alt="Vietnamese Flag"/>
-                                    <span data-txt="Vietnamese"></span>
-                                </label>
+                <div class="settings-group">
+                    <h3 class="settings-group-title">Appearance</h3>
+                    <div class="settings-section">
+                        <p class="settings-label" data-key="theme">Theme</p>
+                        <div class="theme-switcher">
+                            <div class="tabs">
+                                <input type="radio" id="radio-dark" name="theme" value="dark" checked>
+                                <label class="tab" for="radio-dark" data-key="dark">Dark</label>
+                                <input type="radio" id="radio-light" name="theme" value="light">
+                                <label class="tab" for="radio-light" data-key="light">Light</label>
+                                <span class="glider"></span>
                             </div>
                         </div>
                     </div>
+                    <div class="settings-section">
+                        <p class="settings-label" data-key="chatboxSize">Chatbox Size</p>
+                        <div class="size-switcher">
+                            <div class="tabs">
+                                <input type="radio" id="radio-default" name="size" value="default" checked>
+                                <label class="tab" for="radio-default" data-key="default">Default</label>
+                                <input type="radio" id="radio-large" name="size" value="large">
+                                <label class="tab" for="radio-large" data-key="large">Large</label>
+                                <span class="glider"></span>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="settings-section">
+                        <p class="settings-label" data-key="autoExpand">Auto-expand on long text</p>
+                        <label class="switch">
+                            <input type="checkbox" id="auto-expand-checkbox" checked>
+                            <span class="slider"></span>
+                        </label>
+                    </div>
                 </div>
-                <div class="settings-section">
-                    <p class="settings-label" data-key="rememberChoice">Remember my choice</p>
-                    <label class="switch">
-                        <input type="checkbox" id="persist-settings-checkbox">
-                        <span class="slider"></span>
-                    </label>
+
+                <div class="settings-group">
+                    <h3 class="settings-group-title">General</h3>
+                    <div class="settings-section">
+                        <p class="settings-label" data-key="language">Language</p>
+                        <div class="select">
+                            <div class="selected" data-english="English" data-vietnamese="Vietnamese"></div>
+                            <div class="options">
+                                <div title="English">
+                                    <input id="lang-en" name="language" type="radio" value="en" checked />
+                                    <label class="option" for="lang-en">
+                                        <img src="english.png" alt="English Flag"/>
+                                        <span data-txt="English"></span>
+                                    </label>
+                                </div>
+                                <div title="Vietnamese">
+                                    <input id="lang-vi" name="language" type="radio" value="vi" />
+                                    <label class="option" for="lang-vi">
+                                        <img src="vietnamese.png" alt="Vietnamese Flag"/>
+                                        <span data-txt="Vietnamese"></span>
+                                    </label>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="settings-section">
+                        <p class="settings-label" data-key="rememberChoice">Remember my choice</p>
+                        <label class="switch">
+                            <input type="checkbox" id="persist-settings-checkbox">
+                            <span class="slider"></span>
+                        </label>
+                    </div>
                 </div>
-                <button id="export-chat-button" class="settings-button" data-key="exportChat">Export Chat</button>
-                <button id="clear-chat-button" class="settings-button" data-key="clearChat">Clear Chat History</button>
+
+                <div class="settings-group">
+                    <h3 class="settings-group-title">Data</h3>
+                    <button id="export-chat-button" class="settings-button" data-key="exportChat">Export Chat</button>
+                    <button id="clear-chat-button" class="settings-button" data-key="clearChat">Clear Chat History</button>
+                </div>
             </div>
         </div>
     </div>

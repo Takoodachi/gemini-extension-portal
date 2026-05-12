@@ -1,24 +1,34 @@
-# Gemini Portal!
+# Gemini Portal
 ## I. Introduction
-Like what the name implies, a chatbox with Gemini! With this, you can consult Gemini on ***any and every*** website!
+Gemini Portal is a Google Chrome extension that embeds a Gemini-powered chatbox directly into your web browser, allowing you to consult Gemini on any website without switching tabs.
+
 ## II. What and How
-Gemini Portal is a Google Extension that allows you to chat with Gemini on any website you are on with a simple click on the floating button. Clone the project to your own computer, add an env.js file with your API keys, and you are good to go! (Instructions on how to do this below, after <ins>Features</ins>)
+The extension adds a floating chat icon to the bottom right of any webpage. Clicking it opens an integrated chat interface. You will need your own API keys to use it. (See <ins>Instructions</ins> below).
+
 ## III. Features
-### 1. Consult with Gemini through chatting!<br/>
-Suddenly curious about something without wanting to open another tab to ask? Just click on the floating button and immediately ask Gemini! Equipped with grounding with Google Search, Gemini will return the newest possible information, just like a search engine!
-### 2. Upload images for further help with Gemini!<br/>
-Upload an image, or directly paste (Ctrl + V/Command + V) an image into the chatbox to have Gemini assist you better!
-### 3. Language support! Gemini will also reply in whichever language you choose! (Currently supports Vietnamese and English)<br/>
-Change the UI and have Gemini chat with you in your preferred language! More languages coming in the future!
-### 4. UI Settings!<br/>
-Change from Dark to Light, Default size to Large size chatbox, anything to accommodate your preference!
+### 1. Highlight-to-Prompt (Context Menus)
+Highlight text on any webpage, right-click, and select "Summarize", "Explain", "Translate to Vietnamese", "Fix grammar", or "Rephrase". The extension will automatically open the chatbox and send the prompt for you.
+### 2. Page Summarization
+Click the new summarize icon in the chat header to instantly extract and summarize the current webpage's content.
+### 3. Streaming Responses
+Gemini's responses are streamed in real-time. A "Stop Generation" button is available if you need to halt the output.
+### 4. Voice Dictation & Text-to-Speech
+Click the microphone icon to speak your prompts. Gemini can also read its responses aloud via the speaker button attached to every message.
+### 5. Multi-modal Support
+Upload an image or paste it directly into the chatbox (Ctrl+V) to include it in your prompt.
+### 6. Chat Exporting
+Export your current chat history to a Markdown file directly from the Settings menu.
+### 7. Customization
+Change from Dark to Light mode, adjust the chatbox size, or have the chatbox automatically expand for long responses.
+
 ## IV. Instructions on how to use this extension
-Create your own ***env.js*** file, then add the following API keys:
-```
+Create your own `env.js` file in the root extension directory, then add the following API keys:
+```javascript
 const GEMINI_API_KEY = "YOUR_API_KEY_HERE";
 const GOOGLE_SEARCH_API_KEY = "YOUR_API_KEY_HERE";
 const CUSTOM_SEARCH_ENGINE_ID = "YOUR_API_KEY_HERE";
 ```
-Save the extension, then reload it on Google, and it should start working immediately!
-## V. Email me to leave suggestions and/or reviews!
+Save the extension, then load it unpacked in `chrome://extensions/`. Refresh any open tabs to start using it!
+
+## V. Contact
 Leave a suggestion/review at: luongdtran06@gmail.com!

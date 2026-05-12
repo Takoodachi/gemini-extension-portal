@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Gemini Portal",
-  "version": "1.0",
+  "version": "2.0",
   "description": "A floating chat portal for Gemini on every website.",
   "permissions": [
     "storage",
@@ -36,9 +36,16 @@
   },
   "content_scripts": [
     {
-      "matches": ["<all_urls>"],
-      "js": ["env.js", "content.js"],
-      "css": ["styles.css"]
+      "matches": [
+        "<all_urls>"
+      ],
+      "js": [
+        "env.js",
+        "content.js"
+      ],
+      "css": [
+        "styles.css"
+      ]
     }
   ],
   "web_accessible_resources": [
@@ -61,7 +68,9 @@
         "vietnamese.png",
         "Lexend/static/*.ttf"
       ],
-      "matches": ["<all_urls>"]
+      "matches": [
+        "<all_urls>"
+      ]
     }
   ],
   "icons": {

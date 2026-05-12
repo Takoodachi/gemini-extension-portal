@@ -4,7 +4,8 @@
   "version": "1.0",
   "description": "A floating chat portal for Gemini on every website.",
   "permissions": [
-    "storage"
+    "storage",
+    "contextMenus"
   ],
   "host_permissions": [
     "https://*/*", 

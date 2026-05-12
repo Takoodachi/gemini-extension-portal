@@ -9,20 +9,29 @@
         <div id="gemini-chat-ui">
             <div id="gemini-chat-header">
                 <span data-key="geminiChat">Gemini Chat</span>
-                <button id="gemini-settings-button"><img id="settings-icon" src="settings-dark.png" alt="Settings"/></button>
+                <div class="header-actions">
+                    <button id="gemini-summarize-button" title="Summarize this page">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line><polyline points="10 9 9 9 8 9"></polyline></svg>
+                    </button>
+                    <button id="gemini-settings-button"><img id="settings-icon" src="settings-dark.png" alt="Settings"/></button>
+                </div>
             </div>
             <div id="gemini-chat-history"></div>
             <div id="image-preview-container"></div>
             <div id="gemini-input-area">
-				<input type="file" id="image-upload-input" accept="image/*" style="display: none;">
-				<button id="image-upload-button">
-					<img id="upload-icon" src="upload-dark.png" alt="Upload Image"/>
-				</button>
-				<div id="input-wrapper">
-					<textarea id="gemini-prompt-input" placeholder="Type your message..."></textarea>
-					<button id="gemini-send-button"><img id="send-icon" src="" alt="Send"/></button>
-				</div>
-			</div>
+                <input type="file" id="image-upload-input" accept="image/*" style="display: none;">
+                <div id="input-wrapper">
+                    <button id="image-upload-button">
+                        <img id="upload-icon" src="upload-dark.png" alt="Upload Image"/>
+                    </button>
+                    <textarea id="gemini-prompt-input" placeholder="Type your message..."></textarea>
+                    <button id="gemini-mic-button" title="Voice Dictation">🎙️</button>
+                    <button id="gemini-send-button" title="Send"><img id="send-icon" src="" alt="Send"/></button>
+                    <button id="gemini-stop-button" title="Stop generation">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><rect x="4" y="4" width="16" height="16" rx="2"/></svg>
+                    </button>
+                </div>
+            </div>
         </div>
 
         <div id="gemini-settings-ui">
@@ -55,26 +64,26 @@
                         </div>
                     </div>
                 </div>
-				<div class="settings-section">
+                <div class="settings-section">
                     <p class="settings-label" data-key="language">Language</p>
                     <div class="select">
                         <div class="selected" data-english="English" data-vietnamese="Vietnamese"></div>
                         <div class="options">
-							<div title="English">
-								<input id="lang-en" name="language" type="radio" value="en" checked />
-								<label class="option" for="lang-en">
-									<img src="english.png" alt="English Flag"/>
-									<span data-txt="English"></span>
-								</label>
-							</div>
-							<div title="Vietnamese">
-								<input id="lang-vi" name="language" type="radio" value="vi" />
-								<label class="option" for="lang-vi">
-									<img src="vietnamese.png" alt="Vietnamese Flag"/>
-									<span data-txt="Vietnamese"></span>
-								</label>
-							</div>
-						</div>
+                            <div title="English">
+                                <input id="lang-en" name="language" type="radio" value="en" checked />
+                                <label class="option" for="lang-en">
+                                    <img src="english.png" alt="English Flag"/>
+                                    <span data-txt="English"></span>
+                                </label>
+                            </div>
+                            <div title="Vietnamese">
+                                <input id="lang-vi" name="language" type="radio" value="vi" />
+                                <label class="option" for="lang-vi">
+                                    <img src="vietnamese.png" alt="Vietnamese Flag"/>
+                                    <span data-txt="Vietnamese"></span>
+                                </label>
+                            </div>
+                        </div>
                     </div>
                 </div>
                 <div class="settings-section">
@@ -84,20 +93,21 @@
                         <span class="slider"></span>
                     </label>
                 </div>
+                <button id="export-chat-button" class="settings-button" data-key="exportChat">Export Chat</button>
                 <button id="clear-chat-button" class="settings-button" data-key="clearChat">Clear Chat History</button>
             </div>
         </div>
     </div>
-	<div id="confirmation-modal" class="hidden">
-		<div class="confirmation-box">
+    <div id="confirmation-modal" class="hidden">
+        <div class="confirmation-box">
             <p class="confirmation-text" data-key="clearConfirm">Are you sure?</p>
             <div class="confirmation-actions">
-				<button id="confirm-yes" class="confirm-btn" data-key="yes">Yes</button>
+                <button id="confirm-yes" class="confirm-btn" data-key="yes">Yes</button>
                 <button id="confirm-no" class="confirm-btn" data-key="no">No</button>
-			</div>
-		</div>
+            </div>
+        </div>
     </div>
-	<div id="success-modal" class="hidden">
+    <div id="success-modal" class="hidden">
         <div class="confirmation-box">
             <p class="confirmation-text" data-key="chatCleared">Chat history cleared!</p>
             <div class="confirmation-actions">

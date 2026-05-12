@@ -2,22 +2,27 @@
     if (window.hasRunGeminiPortal) return;
     window.hasRunGeminiPortal = true;
 
-    // State Variables
+    // State
     let container = null;
     let floatingButton = null;
     let chatIframe = null;
     let chatHistory = [];
     let currentLanguage = 'en';
-    
-    // Event Listener References
+    let currentAbortController = null;
+
+    // Listener references for cleanup
     let handleDragMove = null;
     let handleDragEnd = null;
     let handleDocClick = null;
     let handleWindowMessage = null;
+    let handleKeyDown = null;
 
-    // Logic to Enable (Create UI)
+    function sendToIframe(message) {
+        if (chatIframe) chatIframe.contentWindow.postMessage(message, '*');
+    }
+
     function enableFeature() {
-        if (container) return; 
+        if (container) return;
 
         container = document.createElement('div');
         container.id = 'gemini-chatbox-container';
@@ -39,33 +44,41 @@
 
         chatIframe = document.createElement('iframe');
         chatIframe.id = 'gemini-chat-iframe';
-        chatIframe.src = chrome.runtime.getURL('chatbox.html');
+        chatIframe.allow = "microphone";
+        chatIframe.src = chrome.runtime.getURL('chatbox.html') + '?v=' + Date.now();
         container.appendChild(chatIframe);
+
+        // Drag state
+        let isDragging = false;
+        let hasDragged = false;
+        let wasVisibleOnDragStart = false;
+        let offsetX = 0, offsetY = 0;
+        let initialMouseX, initialMouseY;
+
+        // Restore saved widget position
+        chrome.storage.local.get('widgetPosition', (data) => {
+            if (data.widgetPosition) {
+                offsetX = data.widgetPosition.x;
+                offsetY = data.widgetPosition.y;
+                container.style.transform = `translate(${offsetX}px, ${offsetY}px)`;
+                updateQuadrantClass();
+            }
+        });
 
         chatIframe.addEventListener('load', () => {
             chrome.storage.session.get("chatHistory", (data) => {
                 if (data.chatHistory) {
                     chatHistory = data.chatHistory;
-                    chatIframe.contentWindow.postMessage({ 
-                        type: 'RESTORE_HISTORY', 
-                        history: chatHistory 
-                    }, '*');
+                    sendToIframe({ type: 'RESTORE_HISTORY', history: chatHistory });
                 }
             });
         });
 
         chatIframe.addEventListener('transitionend', (event) => {
             if (event.propertyName === 'width') {
-                chatIframe.contentWindow.postMessage({ type: 'IFRAME_RESIZED' }, '*');
+                sendToIframe({ type: 'IFRAME_RESIZED' });
             }
         });
-
-        // Setup Drag & Drop Logic
-        let isDragging = false;
-        let hasDragged = false;
-        let wasVisibleOnDragStart = false;
-        let offsetX = 0, offsetY = 0;
-        let initialMouseX, initialMouseY;
 
         floatingButton.addEventListener('mousedown', (e) => {
             e.preventDefault();
@@ -83,137 +96,96 @@
             if (!isDragging) return;
             const dx = e.clientX - initialMouseX;
             const dy = e.clientY - initialMouseY;
-            if (Math.abs(dx) > 5 || Math.abs(dy) > 5) { hasDragged = true; }
-            
-            // Calculate new position
+            if (Math.abs(dx) > 5 || Math.abs(dy) > 5) hasDragged = true;
+
             let newX = offsetX + dx;
             let newY = offsetY + dy;
-            
-            // Apply transform to get actual position
             container.style.transform = `translate(${newX}px, ${newY}px)`;
-            
-            // Get actual container position after transform
-            const containerRect = container.getBoundingClientRect();
-            const viewportWidth = window.innerWidth;
-            const viewportHeight = window.innerHeight;
-            
-            // Constrain to viewport boundaries
-            let constrainedX = newX;
-            let constrainedY = newY;
-            
-            // If container goes outside left edge, constrain it
-            if (containerRect.left < 0) {
-                constrainedX = newX - containerRect.left;
-            }
-            // If container goes outside right edge, constrain it
-            if (containerRect.right > viewportWidth) {
-                constrainedX = newX - (containerRect.right - viewportWidth);
-            }
-            // If container goes outside top edge, constrain it
-            if (containerRect.top < 0) {
-                constrainedY = newY - containerRect.top;
-            }
-            // If container goes outside bottom edge, constrain it
-            if (containerRect.bottom > viewportHeight) {
-                constrainedY = newY - (containerRect.bottom - viewportHeight);
-            }
-            
-            // Apply constrained position
-            container.style.transform = `translate(${constrainedX}px, ${constrainedY}px)`;
+
+            const r = container.getBoundingClientRect();
+            const vw = window.innerWidth, vh = window.innerHeight;
+            if (r.left < 0) newX -= r.left;
+            if (r.right > vw) newX -= (r.right - vw);
+            if (r.top < 0) newY -= r.top;
+            if (r.bottom > vh) newY -= (r.bottom - vh);
+            container.style.transform = `translate(${newX}px, ${newY}px)`;
         };
 
         handleDragEnd = (e) => {
-            if (isDragging) {
-                isDragging = false;
-                floatingButton.style.cursor = 'grab';
-                const dx = e.clientX - initialMouseX;
-                const dy = e.clientY - initialMouseY;
-                let newOffsetX = offsetX + dx;
-                let newOffsetY = offsetY + dy;
-                
-                // Constrain final position to viewport boundaries
-                container.style.transform = `translate(${newOffsetX}px, ${newOffsetY}px)`;
-                const containerRect = container.getBoundingClientRect();
-                const viewportWidth = window.innerWidth;
-                const viewportHeight = window.innerHeight;
-                
-                // Adjust if outside boundaries
-                if (containerRect.left < 0) {
-                    newOffsetX = newOffsetX - containerRect.left;
-                }
-                if (containerRect.right > viewportWidth) {
-                    newOffsetX = newOffsetX - (containerRect.right - viewportWidth);
-                }
-                if (containerRect.top < 0) {
-                    newOffsetY = newOffsetY - containerRect.top;
-                }
-                if (containerRect.bottom > viewportHeight) {
-                    newOffsetY = newOffsetY - (containerRect.bottom - viewportHeight);
-                }
-                
-                if (hasDragged) {
-                    const snapResult = snapToEdges(newOffsetX, newOffsetY);
-                    offsetX = snapResult.x;
-                    offsetY = snapResult.y;
-                    
-                    container.style.transform = `translate(${offsetX}px, ${offsetY}px)`;
-                    const snappedRect = container.getBoundingClientRect();
-                    if (snappedRect.left < 0) {
-                        offsetX = offsetX - snappedRect.left;
-                    }
-                    if (snappedRect.right > viewportWidth) {
-                        offsetX = offsetX - (snappedRect.right - viewportWidth);
-                    }
-                    if (snappedRect.top < 0) {
-                        offsetY = offsetY - snappedRect.top;
-                    }
-                    if (snappedRect.bottom > viewportHeight) {
-                        offsetY = offsetY - (snappedRect.bottom - viewportHeight);
-                    }
-                    
-                    container.style.transition = 'transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1)';
-                    container.style.transform = `translate(${offsetX}px, ${offsetY}px)`;
-                    
-                    setTimeout(() => {
-                        updateQuadrantClass();
-                        container.style.transition = 'transform 0.2s ease-out';
-                    }, 300);
-                    
-                    if (wasVisibleOnDragStart) toggleChatbox();
-                } else {
-                    offsetX = newOffsetX;
-                    offsetY = newOffsetY;
+            if (!isDragging) return;
+            isDragging = false;
+            floatingButton.style.cursor = 'grab';
+            const dx = e.clientX - initialMouseX;
+            const dy = e.clientY - initialMouseY;
+            let newOffsetX = offsetX + dx;
+            let newOffsetY = offsetY + dy;
+
+            container.style.transform = `translate(${newOffsetX}px, ${newOffsetY}px)`;
+            const r = container.getBoundingClientRect();
+            const vw = window.innerWidth, vh = window.innerHeight;
+            if (r.left < 0) newOffsetX -= r.left;
+            if (r.right > vw) newOffsetX -= (r.right - vw);
+            if (r.top < 0) newOffsetY -= r.top;
+            if (r.bottom > vh) newOffsetY -= (r.bottom - vh);
+
+            if (hasDragged) {
+                const snap = snapToEdges(newOffsetX, newOffsetY);
+                offsetX = snap.x;
+                offsetY = snap.y;
+                container.style.transform = `translate(${offsetX}px, ${offsetY}px)`;
+                const sr = container.getBoundingClientRect();
+                if (sr.left < 0) offsetX -= sr.left;
+                if (sr.right > vw) offsetX -= (sr.right - vw);
+                if (sr.top < 0) offsetY -= sr.top;
+                if (sr.bottom > vh) offsetY -= (sr.bottom - vh);
+
+                container.style.transition = 'transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1)';
+                container.style.transform = `translate(${offsetX}px, ${offsetY}px)`;
+
+                // Persist position across page loads
+                chrome.storage.local.set({ widgetPosition: { x: offsetX, y: offsetY } });
+
+                setTimeout(() => {
+                    updateQuadrantClass();
                     container.style.transition = 'transform 0.2s ease-out';
-                    if (!wasVisibleOnDragStart) toggleChatbox();
-                }
+                }, 300);
+
+                if (wasVisibleOnDragStart) toggleChatbox();
+            } else {
+                offsetX = newOffsetX;
+                offsetY = newOffsetY;
+                container.style.transition = 'transform 0.2s ease-out';
+                if (!wasVisibleOnDragStart) toggleChatbox();
             }
         };
 
         handleDocClick = (event) => {
             if (!container) return;
-            const isChatVisible = chatIframe.classList.contains('gemini-iframe-visible');
-            const isClickOutside = !container.contains(event.target);
-            if (isChatVisible && isClickOutside) { toggleChatbox(); }
+            if (chatIframe.classList.contains('gemini-iframe-visible') && !container.contains(event.target)) {
+                toggleChatbox();
+            }
+        };
+
+        handleKeyDown = (event) => {
+            if (event.key === 'Escape' && chatIframe && chatIframe.classList.contains('gemini-iframe-visible')) {
+                toggleChatbox();
+            }
         };
 
         document.addEventListener('mousemove', handleDragMove);
         document.addEventListener('mouseup', handleDragEnd);
         document.addEventListener('click', handleDocClick);
+        document.addEventListener('keydown', handleKeyDown);
 
-        // Setup Message Handling
         handleWindowMessage = async (event) => {
             if (!chatIframe || event.source !== chatIframe.contentWindow) return;
             const message = event.data;
 
             if (message.type === 'LANGUAGE_CHANGED') {
                 currentLanguage = message.lang;
-                return;
-            }
-            if (message.type === 'SIZE_CHANGED') {
+            } else if (message.type === 'SIZE_CHANGED') {
                 chatIframe.style.width = (message.size === 'large') ? '700px' : '350px';
-                return;
-            }
-            if (message.type === 'THEME_CHANGED') {
+            } else if (message.type === 'THEME_CHANGED') {
                 if (message.theme === 'light') {
                     floatingButton.style.backgroundColor = '#FFFFFF';
                     floatingButtonIcon.src = chrome.runtime.getURL('chat-icon-light.png');
@@ -221,18 +193,19 @@
                     floatingButton.style.backgroundColor = '#121212';
                     floatingButtonIcon.src = chrome.runtime.getURL('chat-icon-dark.png');
                 }
-                return;
-            }
-            if (message.type === 'CLEAR_CHAT_HISTORY') {
+            } else if (message.type === 'CLEAR_CHAT_HISTORY') {
                 chatHistory = [];
-                // Clear storage
                 chrome.storage.session.remove("chatHistory");
-                return;
-            }
-            if (message.type === 'TOGGLE_CHATBOX') {
+            } else if (message.type === 'TOGGLE_CHATBOX') {
                 toggleChatbox();
-            }
-            if (message.type === 'GEMINI_PROMPT') {
+            } else if (message.type === 'SUMMARIZE_PAGE') {
+                if (!chatIframe.classList.contains('gemini-iframe-visible')) toggleChatbox();
+                const pageText = document.body.innerText.slice(0, 15000);
+                sendToIframe({ type: 'ADD_USER_MESSAGE', text: 'Summarize this page' });
+                handleGeminiPrompt({ text: `Please summarize the content of this page:\n\n${pageText}` });
+            } else if (message.type === 'STOP_GENERATION') {
+                if (currentAbortController) currentAbortController.abort();
+            } else if (message.type === 'GEMINI_PROMPT') {
                 handleGeminiPrompt(message);
             }
         };
@@ -240,86 +213,58 @@
         window.addEventListener('message', handleWindowMessage);
     }
 
-    // Logic to Disable (Remove UI)
     function disableFeature() {
         if (!container) return;
-        if (handleDragMove) document.removeEventListener('mousemove', handleDragMove);
-        if (handleDragEnd) document.removeEventListener('mouseup', handleDragEnd);
-        if (handleDocClick) document.removeEventListener('click', handleDocClick);
-        if (handleWindowMessage) window.removeEventListener('message', handleWindowMessage);
+        if (currentAbortController) currentAbortController.abort();
+        document.removeEventListener('mousemove', handleDragMove);
+        document.removeEventListener('mouseup', handleDragEnd);
+        document.removeEventListener('click', handleDocClick);
+        document.removeEventListener('keydown', handleKeyDown);
+        window.removeEventListener('message', handleWindowMessage);
         container.remove();
         container = null;
         floatingButton = null;
         chatIframe = null;
-
     }
 
-    // Listen for Storage Changes (Sync across tabs)
+    // Sync chat history across tabs
     chrome.storage.onChanged.addListener((changes, namespace) => {
         if (namespace === 'session' && changes.chatHistory) {
             chatHistory = changes.chatHistory.newValue || [];
-            if (chatIframe) {
-                chatIframe.contentWindow.postMessage({ 
-                    type: 'RESTORE_HISTORY', 
-                    history: chatHistory 
-                }, '*');
-            }
+            if (chatIframe) sendToIframe({ type: 'RESTORE_HISTORY', history: chatHistory });
         }
     });
 
-    // Helper Functions
     function updateQuadrantClass() {
         if (!container) return;
         const rect = container.getBoundingClientRect();
-        const windowWidth = window.innerWidth;
-        const windowHeight = window.innerHeight;
         container.classList.remove('top-left', 'top-right', 'bottom-left', 'bottom-right');
-        const isTop = rect.top + (rect.height / 2) < windowHeight / 2;
-        const isLeft = rect.left + (rect.width / 2) < windowWidth / 2;
-        if (isTop && isLeft) { container.classList.add('top-left'); }
-        else if (isTop && !isLeft) { container.classList.add('top-right'); }
-        else if (!isTop && isLeft) { container.classList.add('bottom-left'); }
-        else { container.classList.add('bottom-right'); }
+        const isTop = rect.top + rect.height / 2 < window.innerHeight / 2;
+        const isLeft = rect.left + rect.width / 2 < window.innerWidth / 2;
+        container.classList.add(`${isTop ? 'top' : 'bottom'}-${isLeft ? 'left' : 'right'}`);
     }
 
-    // Snap-to-Edges Function
     function snapToEdges(currentX, currentY) {
         if (!container) return { x: currentX, y: currentY };
-        
         const rect = container.getBoundingClientRect();
-        const snapThreshold = 100;
-        const edgeMargin = 20;
-        
-        const windowWidth = window.innerWidth;
-        const windowHeight = window.innerHeight;
-        
-        let snapX = currentX;
-        let snapY = currentY;
-        let snapped = false;
+        const snapThreshold = 100, edgeMargin = 20;
+        const vw = window.innerWidth, vh = window.innerHeight;
+        let snapX = currentX, snapY = currentY;
 
-        if (rect.left < snapThreshold + edgeMargin) {
-            snapX = currentX - (rect.left - edgeMargin);
-            snapped = true;
-        } 
-        else if (rect.right > windowWidth - (snapThreshold + edgeMargin)) {
-            snapX = currentX + (windowWidth - rect.right - edgeMargin);
-            snapped = true;
-        }
+        if (rect.left < snapThreshold + edgeMargin) snapX = currentX - (rect.left - edgeMargin);
+        else if (rect.right > vw - (snapThreshold + edgeMargin)) snapX = currentX + (vw - rect.right - edgeMargin);
+        if (rect.top < snapThreshold + edgeMargin) snapY = currentY - (rect.top - edgeMargin);
+        else if (rect.bottom > vh - (snapThreshold + edgeMargin)) snapY = currentY + (vh - rect.bottom - edgeMargin);
 
-        if (rect.top < snapThreshold + edgeMargin) {
-            snapY = currentY - (rect.top - edgeMargin);
-            snapped = true;
-        } 
-        else if (rect.bottom > windowHeight - (snapThreshold + edgeMargin)) {
-            snapY = currentY + (windowHeight - rect.bottom - edgeMargin);
-            snapped = true;
-        }
-        
-        return { x: snapX, y: snapY, snapped: snapped };
+        return { x: snapX, y: snapY };
     }
 
-    function toggleChatbox() { 
-        if(chatIframe) chatIframe.classList.toggle('gemini-iframe-visible'); 
+    function toggleChatbox() {
+        if (chatIframe) chatIframe.classList.toggle('gemini-iframe-visible');
+    }
+
+    function sendError(text) {
+        sendToIframe({ type: 'GEMINI_ERROR', text });
     }
 
     async function handleGeminiPrompt(message) {
@@ -329,118 +274,216 @@
         if (userImageData) {
             userParts.push({ inline_data: { mime_type: userImageData.match(/:(.*?);/)[1], data: userImageData.split(',')[1] } });
         }
-        if (userPrompt) { userParts.push({ text: userPrompt }); }
+        if (userPrompt) userParts.push({ text: userPrompt });
 
         chatHistory.push({ role: "user", parts: userParts });
-        chrome.storage.session.set({ chatHistory: chatHistory });
+        chrome.storage.session.set({ chatHistory });
+
+        currentAbortController = new AbortController();
 
         try {
-            const result = await callGeminiApi(chatHistory);
-            let modelResponseCandidate = result.candidates?.[0];
+            const result = await streamGeminiRequest(chatHistory, null, currentAbortController.signal);
 
-            if (!modelResponseCandidate) {
-               sendError("The model's response was blocked.");
-               return;
-            }
+            if (result.functionCall) {
+                const { functionCall } = result;
+                chatHistory.push({ role: "model", parts: [{ functionCall }] });
 
-            const functionCall = modelResponseCandidate.content.parts?.[0]?.functionCall;
-            if (functionCall) {
-                chatHistory.push({ role: "model", parts: [{ functionCall: functionCall }] });
                 let toolOutput;
                 if (functionCall.name === 'googleSearch') {
                     toolOutput = await executeGoogleSearch(functionCall.args.query);
                 } else {
                     toolOutput = { error: `Unknown function: ${functionCall.name}` };
                 }
-                const secondResult = await callGeminiApi(chatHistory, { name: functionCall.name, response: toolOutput });
-                modelResponseCandidate = secondResult.candidates?.[0];
+
+                currentAbortController = new AbortController();
+                const finalResult = await streamGeminiRequest(
+                    chatHistory,
+                    { name: functionCall.name, response: toolOutput },
+                    currentAbortController.signal
+                );
+
+                if (finalResult.text) {
+                    chatHistory.push({ role: "model", parts: [{ text: finalResult.text }] });
+                    chrome.storage.session.set({ chatHistory });
+                }
+            } else if (result.text) {
+                chatHistory.push({ role: "model", parts: [{ text: result.text }] });
+                chrome.storage.session.set({ chatHistory });
+            } else if (!result.functionCall) {
+                sendError("The model did not return a response.");
             }
-
-            const geminiResponseText = modelResponseCandidate?.content.parts?.[0]?.text;
-            const groundingMetadata = modelResponseCandidate?.groundingMetadata;
-
-            if (geminiResponseText) {
-                chatHistory.push({ role: "model", parts: [{ text: geminiResponseText }] });
-                chrome.storage.session.set({ chatHistory: chatHistory });
-
-                chatIframe.contentWindow.postMessage({
-                    type: 'GEMINI_RESPONSE',
-                    text: geminiResponseText,
-                    groundingMetadata: groundingMetadata
-                }, '*');
-            } else {
-                sendError("The model did not provide a text response.");
-            }
-
         } catch (error) {
-            console.error(error);
-            sendError(`An unhandled error occurred: ${error.message}`);
+            if (error.name === 'AbortError') {
+                sendToIframe({ type: 'GEMINI_STREAM_ABORT' });
+            } else {
+                console.error(error);
+                sendError(`Error: ${error.message}`);
+            }
+        } finally {
+            currentAbortController = null;
         }
     }
 
-    function sendError(text) {
-        if (chatIframe) chatIframe.contentWindow.postMessage({ type: 'GEMINI_ERROR', text: text }, '*');
+    async function streamGeminiRequest(history, toolOutputs, signal) {
+        const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:streamGenerateContent?key=${GEMINI_API_KEY}&alt=sse`;
+        const payload = buildGeminiPayload(history, toolOutputs);
+
+        const response = await fetch(url, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload),
+            signal
+        });
+
+        if (!response.ok) {
+            const errBody = await response.text().catch(() => response.statusText);
+            throw new Error(`API Error ${response.status}: ${errBody}`);
+        }
+
+        const reader = response.body.getReader();
+        const decoder = new TextDecoder();
+        let buffer = '';
+        let accumulatedText = '';
+        let functionCall = null;
+        let groundingMetadata = null;
+        let streamStarted = false;
+
+        try {
+            while (true) {
+                const { done, value } = await reader.read();
+                if (done) break;
+
+                buffer += decoder.decode(value, { stream: true });
+                const lines = buffer.split('\n');
+                buffer = lines.pop();
+
+                for (const line of lines) {
+                    if (!line.startsWith('data: ')) continue;
+                    const jsonStr = line.slice(6).trim();
+                    if (!jsonStr) continue;
+
+                    try {
+                        const chunk = JSON.parse(jsonStr);
+                        const candidate = chunk.candidates?.[0];
+                        if (!candidate) continue;
+
+                        if (candidate.groundingMetadata) groundingMetadata = candidate.groundingMetadata;
+
+                        const part = candidate.content?.parts?.[0];
+                        if (!part) continue;
+
+                        if (part.functionCall) {
+                            functionCall = part.functionCall;
+                        } else if (part.text) {
+                            if (!streamStarted) {
+                                streamStarted = true;
+                                sendToIframe({ type: 'GEMINI_STREAM_START' });
+                            }
+                            accumulatedText += part.text;
+                            sendToIframe({ type: 'GEMINI_STREAM_CHUNK', text: part.text });
+                        }
+                    } catch (_) { /* ignore malformed chunk */ }
+                }
+            }
+        } finally {
+            reader.releaseLock();
+        }
+
+        if (streamStarted) {
+            sendToIframe({ type: 'GEMINI_STREAM_END', fullText: accumulatedText, groundingMetadata });
+        }
+
+        return { text: accumulatedText || null, functionCall, groundingMetadata };
     }
 
-    // API Functions
-    async function callGeminiApi(history, toolOutputs = null) {
-        const GEMINI_API_URL = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=" + GEMINI_API_KEY;
-        const currentDate = new Date();
-        const formattedDate = currentDate.toLocaleString('en-US', {
+    function buildGeminiPayload(history, toolOutputs) {
+        const formattedDate = new Date().toLocaleString('en-US', {
             weekday: 'long', year: 'numeric', month: 'long', day: 'numeric',
             hour: 'numeric', minute: 'numeric', hour12: true
         });
         const langInstruction = currentLanguage === 'vi' ? 'Please respond in Vietnamese.' : 'Please respond in English.';
 
         const payload = {
-            system_instruction: { parts: [{ text: `System context: The current date and time is ${formattedDate}. ${langInstruction}` }] },
-            tools: [{ functionDeclarations: [{ name: "googleSearch", description: "Search Google for information.", parameters: { type: "object", properties: { query: { type: "string", description: "The search query to send to Google." } }, required: ["query"] } }] }],
-            contents: history
+            system_instruction: {
+                parts: [{ text: `System context: The current date and time is ${formattedDate}. ${langInstruction}` }]
+            },
+            tools: [{
+                functionDeclarations: [{
+                    name: "googleSearch",
+                    description: "Search Google for current information.",
+                    parameters: {
+                        type: "object",
+                        properties: { query: { type: "string", description: "The search query." } },
+                        required: ["query"]
+                    }
+                }]
+            }],
+            contents: [...history]
         };
 
         if (toolOutputs) {
-            payload.contents.push({ role: "function", parts: [{ functionResponse: { name: toolOutputs.name, response: toolOutputs.response } }] });
+            payload.contents.push({
+                role: "function",
+                parts: [{ functionResponse: { name: toolOutputs.name, response: toolOutputs.response } }]
+            });
         }
 
-        const response = await fetch(GEMINI_API_URL, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(payload)
-        });
-        if (!response.ok) throw new Error(response.statusText);
-        return await response.json();
+        return payload;
     }
 
     async function executeGoogleSearch(query) {
-        const GOOGLE_SEARCH_BASE_URL = "https://www.googleapis.com/customsearch/v1";
-        const searchUrl = new URL(GOOGLE_SEARCH_BASE_URL);
-        searchUrl.searchParams.append('q', query);
-        searchUrl.searchParams.append('key', GOOGLE_SEARCH_API_KEY);
-        searchUrl.searchParams.append('cx', CUSTOM_SEARCH_ENGINE_ID);
-
+        const url = new URL("https://www.googleapis.com/customsearch/v1");
+        url.searchParams.append('q', query);
+        url.searchParams.append('key', GOOGLE_SEARCH_API_KEY);
+        url.searchParams.append('cx', CUSTOM_SEARCH_ENGINE_ID);
         try {
-            const response = await fetch(searchUrl.toString());
+            const response = await fetch(url.toString());
             const data = await response.json();
-            let searchResults = [];
-            if (data.items && data.items.length > 0) {
-                data.items.forEach(item => { searchResults.push({ title: item.title, snippet: item.snippet, link: item.link }); });
-            } else { searchResults.push({ snippet: "No search results found." }); }
-            return { results: searchResults };
-        } catch (error) { return { error: error.message }; }
+            const results = (data.items || []).map(item => ({ title: item.title, snippet: item.snippet, link: item.link }));
+            return { results: results.length ? results : [{ snippet: "No results found." }] };
+        } catch (error) {
+            return { error: error.message };
+        }
     }
 
-    // Initialization
-    chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
+    const CONTEXT_MENU_PREFIXES = {
+        "gemini-summarize":    "Summarize this:\n\n",
+        "gemini-explain":      "Explain this:\n\n",
+        "gemini-fix-grammar":  "Fix the grammar and spelling of this text:\n\n",
+        "gemini-rephrase":     "Rephrase and rewrite this text:\n\n",
+        "gemini-shorten":      "Make this text shorter and more concise:\n\n",
+        "gemini-translate-vi": "Translate this to Vietnamese:\n\n",
+        "gemini-translate-en": "Translate this to English:\n\n"
+    };
+
+    const CONTEXT_MENU_LABELS = {
+        "gemini-summarize":    "Summarize",
+        "gemini-explain":      "Explain",
+        "gemini-fix-grammar":  "Fix grammar",
+        "gemini-rephrase":     "Rephrase",
+        "gemini-shorten":      "Make shorter",
+        "gemini-translate-vi": "Translate to Vietnamese",
+        "gemini-translate-en": "Translate to English"
+    };
+
+    chrome.runtime.onMessage.addListener((request) => {
         if (request.action === "toggleState") {
-            if (request.enabled) enableFeature();
-            else disableFeature();
+            if (request.enabled) enableFeature(); else disableFeature();
+        } else if (request.action === "contextMenuClick") {
+            enableFeature();
+            setTimeout(() => {
+                if (!chatIframe.classList.contains('gemini-iframe-visible')) toggleChatbox();
+                const prefix = CONTEXT_MENU_PREFIXES[request.menuId] || "";
+                const label = CONTEXT_MENU_LABELS[request.menuId] || "Action";
+                const preview = request.text.slice(0, 80) + (request.text.length > 80 ? '…' : '');
+                sendToIframe({ type: 'ADD_USER_MESSAGE', text: `${label}: "${preview}"` });
+                handleGeminiPrompt({ text: prefix + request.text });
+            }, 100);
         }
     });
 
     chrome.storage.local.get("isEnabled", (data) => {
-        if (data.isEnabled === undefined || data.isEnabled === true) {
-            enableFeature();
-        }
+        if (data.isEnabled === undefined || data.isEnabled === true) enableFeature();
     });
 
 })();

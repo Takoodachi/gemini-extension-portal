@@ -11,6 +11,11 @@
   font-style: normal;
 }
 
+@keyframes popup-slide-in {
+  from { opacity: 0; transform: translateY(-8px) scale(0.97); }
+  to   { opacity: 1; transform: translateY(0)    scale(1); }
+}
+
 body {
   margin: 0;
   padding: 0;
@@ -25,6 +30,7 @@ body {
   display: flex;
   flex-direction: column;
   gap: 16px;
+  animation: popup-slide-in 0.2s cubic-bezier(0.34, 1.56, 0.64, 1) both;
 }
 
 .popup-header {
@@ -44,6 +50,27 @@ body {
   font-size: 16px;
   font-weight: 600;
   color: #FFFFFF;
+  flex: 1;
+}
+
+/* Status badge */
+.status-badge {
+  font-size: 11px;
+  font-weight: 600;
+  padding: 3px 9px;
+  border-radius: 20px;
+  letter-spacing: 0.3px;
+  transition: background-color 0.35s, color 0.35s, box-shadow 0.35s;
+}
+.status-active {
+  background-color: rgba(34, 197, 94, 0.15);
+  color: #22c55e;
+  box-shadow: 0 0 0 1px rgba(34, 197, 94, 0.25);
+}
+.status-inactive {
+  background-color: rgba(239, 68, 68, 0.12);
+  color: #ef4444;
+  box-shadow: 0 0 0 1px rgba(239, 68, 68, 0.22);
 }
 
 .domain-info {
@@ -54,6 +81,11 @@ body {
   display: flex;
   align-items: center;
   justify-content: space-between;
+  transition: border-color 0.3s, box-shadow 0.3s;
+}
+.domain-info.active-site {
+  border-color: rgba(99, 102, 241, 0.35);
+  box-shadow: 0 0 0 2px rgba(99, 102, 241, 0.1);
 }
 .domain-label {
   font-size: 12px;
@@ -77,6 +109,11 @@ body {
   padding: 16px;
   border-radius: 8px;
   border: 1px solid rgba(255, 255, 255, 0.08);
+  transition: border-color 0.2s, box-shadow 0.2s;
+}
+.settings-group:hover {
+  border-color: rgba(255, 255, 255, 0.13);
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.2);
 }
 .global-group {
   background-color: #1E232C;
@@ -87,6 +124,10 @@ body {
   align-items: center;
   justify-content: space-between;
   gap: 12px;
+  transition: opacity 0.3s;
+}
+.setting-item.dimmed {
+  opacity: 0.45;
 }
 .setting-text {
   display: flex;
@@ -124,7 +165,7 @@ body {
   right: 0;
   bottom: 0;
   background-color: #374151;
-  transition: .4s;
+  transition: background-color 0.35s, box-shadow 0.35s;
   border-radius: 24px;
 }
 .slider:before {
@@ -136,15 +177,17 @@ body {
   left: 3px;
   bottom: 3px;
   background-color: white;
-  transition: .4s;
+  box-shadow: 0 1px 4px rgba(0,0,0,0.3);
+  transition: transform 0.35s cubic-bezier(0.34, 1.56, 0.64, 1);
 }
 input:checked + .slider {
   background-color: #6366f1;
+  box-shadow: 0 0 0 2px rgba(99, 102, 241, 0.25);
 }
 input:checked + .slider:before {
   transform: translateX(20px);
 }
 input:disabled + .slider {
-  opacity: 0.5;
+  opacity: 0.4;
   cursor: not-allowed;
 }

@@ -103,7 +103,8 @@ const TRANSLATIONS = {
         typeMessage: "Type your message...", sources: "Sources:",
         chatCleared: "Chat history cleared!", ok: "OK",
         yes: "Yes", no: "No",
-        copy: "Copy", copied: "Copied!"
+        copy: "Copy", copied: "Copied!",
+        ttsEnabled: "Text-to-Speech button", copyEnabled: "Copy answer button"
     },
     vi: {
         geminiChat: "Trò chuyện Gemini", settings: "Cài đặt", send: "Gửi",
@@ -117,7 +118,8 @@ const TRANSLATIONS = {
         typeMessage: "Nhập tin nhắn của bạn...", sources: "Nguồn:",
         chatCleared: "Đã xóa lịch sử trò chuyện!", ok: "OK",
         yes: "Có", no: "Không",
-        copy: "Sao chép", copied: "Đã sao chép!"
+        copy: "Sao chép", copied: "Đã sao chép!",
+        ttsEnabled: "Nút đọc văn bản", copyEnabled: "Nút sao chép câu trả lời"
     }
 };
 
@@ -133,6 +135,8 @@ class AppState {
         this.isWaitingForResponse = false;
         this.isDictating = false;
         this.autoExpand = true;
+        this.ttsEnabled = true;
+        this.copyEnabled = true;
     }
 }
 
@@ -447,8 +451,9 @@ class ChatManager {
             // TTS button
             const speakerBtn = document.createElement('button');
             speakerBtn.innerHTML = '🔊';
-            speakerBtn.classList.add('msg-action-btn');
+            speakerBtn.classList.add('msg-action-btn', 'tts-btn');
             speakerBtn.title = 'Read aloud';
+            if (!this.state.ttsEnabled) speakerBtn.style.display = 'none';
             speakerBtn.onclick = () => {
                 if (window.speechSynthesis.speaking) {
                     window.speechSynthesis.cancel();
@@ -464,8 +469,9 @@ class ChatManager {
             // Copy button
             const copyBtn = document.createElement('button');
             copyBtn.innerHTML = '📋';
-            copyBtn.classList.add('msg-action-btn');
+            copyBtn.classList.add('msg-action-btn', 'copy-btn');
             copyBtn.title = TRANSLATIONS[this.state.currentLang].copy;
+            if (!this.state.copyEnabled) copyBtn.style.display = 'none';
             copyBtn.onclick = () => {
                 navigator.clipboard.writeText(text).then(() => {
                     copyBtn.innerHTML = '✓';
@@ -634,6 +640,8 @@ class SettingsManager {
         this.langRadios = document.querySelectorAll('input[name="language"]');
         this.persistCheckbox = document.getElementById('persist-settings-checkbox');
         this.autoExpandCheckbox = document.getElementById('auto-expand-checkbox');
+        this.ttsCheckbox = document.getElementById('tts-checkbox');
+        this.copyCheckbox = document.getElementById('copy-checkbox');
         this.bindEvents();
     }
 
@@ -642,9 +650,23 @@ class SettingsManager {
         this.sizeRadios.forEach(r => r.addEventListener('change', () => { this.applySize(r.value); this.saveSettings(); }));
         this.langRadios.forEach(r => r.addEventListener('change', () => { this.applyLanguage(r.value); this.saveSettings(); }));
         this.persistCheckbox.addEventListener('change', () => this.saveSettings());
-        this.autoExpandCheckbox.addEventListener('change', (e) => { 
-            this.state.autoExpand = e.target.checked; 
-            this.saveSettings(); 
+        this.autoExpandCheckbox.addEventListener('change', (e) => {
+            this.state.autoExpand = e.target.checked;
+            this.saveSettings();
+        });
+        this.ttsCheckbox.addEventListener('change', (e) => {
+            this.state.ttsEnabled = e.target.checked;
+            document.querySelectorAll('.tts-btn').forEach(btn => {
+                btn.style.display = e.target.checked ? '' : 'none';
+            });
+            this.saveSettings();
+        });
+        this.copyCheckbox.addEventListener('change', (e) => {
+            this.state.copyEnabled = e.target.checked;
+            document.querySelectorAll('.copy-btn').forEach(btn => {
+                btn.style.display = e.target.checked ? '' : 'none';
+            });
+            this.saveSettings();
         });
     }
 
@@ -670,20 +692,22 @@ class SettingsManager {
         if (persist) {
             const currentTheme = document.body.classList.contains('light-theme') ? 'light' : 'dark';
             const currentSize = document.querySelector('input[name="size"]:checked').value;
-            chrome.storage.local.set({ 
-                theme: currentTheme, 
-                size: currentSize, 
-                language: this.state.currentLang, 
+            chrome.storage.local.set({
+                theme: currentTheme,
+                size: currentSize,
+                language: this.state.currentLang,
                 autoExpand: this.state.autoExpand,
-                persistSettings: true 
+                ttsEnabled: this.state.ttsEnabled,
+                copyEnabled: this.state.copyEnabled,
+                persistSettings: true
             });
         } else {
-            chrome.storage.local.remove(['theme', 'size', 'language', 'autoExpand', 'persistSettings']);
+            chrome.storage.local.remove(['theme', 'size', 'language', 'autoExpand', 'ttsEnabled', 'copyEnabled', 'persistSettings']);
         }
     }
 
     loadSettings() {
-        chrome.storage.local.get(['theme', 'size', 'language', 'autoExpand', 'persistSettings'], result => {
+        chrome.storage.local.get(['theme', 'size', 'language', 'autoExpand', 'ttsEnabled', 'copyEnabled', 'persistSettings'], result => {
             if (result.persistSettings) {
                 this.persistCheckbox.checked = true;
                 this.applyTheme(result.theme || 'dark');
@@ -692,6 +716,14 @@ class SettingsManager {
                 if (result.autoExpand !== undefined) {
                     this.state.autoExpand = result.autoExpand;
                     this.autoExpandCheckbox.checked = result.autoExpand;
+                }
+                if (result.ttsEnabled === false) {
+                    this.state.ttsEnabled = false;
+                    this.ttsCheckbox.checked = false;
+                }
+                if (result.copyEnabled === false) {
+                    this.state.copyEnabled = false;
+                    this.copyCheckbox.checked = false;
                 }
             } else {
                 this.applyTheme('dark');

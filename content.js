@@ -26,7 +26,7 @@
 
         container = document.createElement('div');
         container.id = 'gemini-chatbox-container';
-        container.classList.add('bottom-right');
+        container.classList.add('bottom-right', 'gemini-entering');
         Object.assign(container.style, {
             position: 'fixed',
             bottom: '20px',
@@ -35,6 +35,7 @@
             transition: 'transform 0.2s ease-out'
         });
         document.body.appendChild(container);
+        container.addEventListener('animationend', () => container.classList.remove('gemini-entering'), { once: true });
 
         floatingButton = document.createElement('div');
         floatingButton.id = 'gemini-floating-button';
@@ -230,10 +231,15 @@
         document.removeEventListener('click', handleDocClick);
         document.removeEventListener('keydown', handleKeyDown);
         window.removeEventListener('message', handleWindowMessage);
-        container.remove();
+
+        // Animate out, then remove from DOM
+        const el = container;
         container = null;
         floatingButton = null;
         chatIframe = null;
+        el.classList.add('gemini-hiding');
+        el.addEventListener('animationend', () => el.remove(), { once: true });
+        setTimeout(() => { if (el.parentNode) el.remove(); }, 500);
     }
 
     // Sync chat history across tabs

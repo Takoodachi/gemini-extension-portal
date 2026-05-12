@@ -1,8 +1,34 @@
 document.addEventListener('DOMContentLoaded', async () => {
     const domainValue = document.getElementById('current-domain');
+    const domainInfo = document.querySelector('.domain-info');
+    const statusBadge = document.getElementById('status-badge');
     const toggleGlobal = document.getElementById('toggle-global');
     const toggleDomain = document.getElementById('toggle-domain');
     const toggleData = document.getElementById('toggle-data');
+    const domainSettingItems = [
+        toggleDomain.closest('.setting-item'),
+        toggleData.closest('.setting-item')
+    ];
+
+    function updateStatusBadge(isEnabled) {
+        if (isEnabled) {
+            statusBadge.textContent = 'Active';
+            statusBadge.className = 'status-badge status-active';
+            domainInfo.classList.add('active-site');
+        } else {
+            statusBadge.textContent = 'Off';
+            statusBadge.className = 'status-badge status-inactive';
+            domainInfo.classList.remove('active-site');
+        }
+    }
+
+    function setDomainTogglesEnabled(enabled) {
+        toggleDomain.disabled = !enabled;
+        toggleData.disabled = !enabled;
+        domainSettingItems.forEach(el => {
+            if (el) el.classList.toggle('dimmed', !enabled);
+        });
+    }
 
     // Get current tab domain
     const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
@@ -10,6 +36,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         domainValue.textContent = "Invalid Page";
         toggleDomain.disabled = true;
         toggleData.disabled = true;
+        updateStatusBadge(false);
         return;
     }
 
@@ -19,28 +46,27 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     // Load settings
     chrome.storage.local.get(["globalEnabled", "disabledDomains", "disabledDataDomains"], (data) => {
-        const globalEnabled = data.globalEnabled !== false; // default true
+        const globalEnabled = data.globalEnabled !== false;
         const disabledDomains = data.disabledDomains || [];
         const disabledDataDomains = data.disabledDataDomains || [];
 
+        const domainEnabled = !disabledDomains.includes(hostname);
         toggleGlobal.checked = globalEnabled;
-        toggleDomain.checked = !disabledDomains.includes(hostname);
+        toggleDomain.checked = domainEnabled;
         toggleData.checked = !disabledDataDomains.includes(hostname);
 
-        // Update UI state based on global master switch
-        if (!globalEnabled) {
-            toggleDomain.disabled = true;
-            toggleData.disabled = true;
-        }
+        const fullyEnabled = globalEnabled && domainEnabled;
+        updateStatusBadge(fullyEnabled);
+        if (!globalEnabled) setDomainTogglesEnabled(false);
     });
 
     // Handle Global Toggle
     toggleGlobal.addEventListener('change', (e) => {
         const isEnabled = e.target.checked;
         chrome.storage.local.set({ globalEnabled: isEnabled });
-        
-        toggleDomain.disabled = !isEnabled;
-        toggleData.disabled = !isEnabled;
+        setDomainTogglesEnabled(isEnabled);
+        const domainCurrentlyEnabled = toggleDomain.checked;
+        updateStatusBadge(isEnabled && domainCurrentlyEnabled);
     });
 
     // Handle Domain Toggle
@@ -54,6 +80,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             }
             chrome.storage.local.set({ disabledDomains: domains });
         });
+        updateStatusBadge(toggleGlobal.checked && e.target.checked);
     });
 
     // Handle Data Toggle

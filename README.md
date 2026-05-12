@@ -13,13 +13,17 @@ Click the new summarize icon in the chat header to instantly extract and summari
 ### 3. Streaming Responses
 Gemini's responses are streamed in real-time. A "Stop Generation" button is available if you need to halt the output.
 ### 4. Voice Dictation & Text-to-Speech
-Click the microphone icon to speak your prompts. Gemini can also read its responses aloud via the speaker button attached to every message.
+Click the microphone icon to speak your prompts. Gemini can also read its responses aloud via the speaker button attached to every message (can be toggled in settings).
 ### 5. Multi-modal Support
 Upload an image or paste it directly into the chatbox (Ctrl+V) to include it in your prompt.
-### 6. Chat Exporting
-Export your current chat history to a Markdown file directly from the Settings menu.
-### 7. Customization
-Change from Dark to Light mode, adjust the chatbox size, or have the chatbox automatically expand for long responses.
+### 6. Chat Management
+Export your current chat history to a Markdown file, clear your chat history, and copy individual responses directly from the interface.
+### 7. Customization & Widget Positioning
+Change from Dark to Light mode, adjust the chatbox size, choose which corner the widget appears in, or have the chatbox automatically expand for long responses.
+### 8. Toolbar Quick Settings (Per-Website Control)
+Click the extension icon in your browser toolbar to access the quick settings menu. Here you can toggle the extension's visibility and data access permissions on a per-website basis, or use the Global Master Switch to turn the extension on/off everywhere.
+### 9. Keyboard Shortcuts
+Quickly toggle the Gemini Portal extension on or off using the `Ctrl+Shift+Y` shortcut (`Cmd+Shift+Y` on Mac).
 
 ## IV. Instructions on how to use this extension
 Create your own `env.js` file in the root extension directory, then add the following API keys:

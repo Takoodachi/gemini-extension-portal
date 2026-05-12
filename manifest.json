@@ -8,10 +8,15 @@
     "contextMenus"
   ],
   "host_permissions": [
-    "https://*/*", 
-    "http://*/*", 
-    "https://generativelanguage.googleapis.com/*", 
-    "https://www.googleapis.com/customsearch/v1*"
+    "https://*/*",
+    "http://*/*",
+    "https://generativelanguage.googleapis.com/*",
+    "https://geocoding-api.open-meteo.com/*",
+    "https://api.open-meteo.com/*",
+    "https://cdn.jsdelivr.net/*",
+    "https://en.wikipedia.org/*",
+    "https://gnews.io/*",
+    "https://www.alphavantage.co/*"
   ],
   "background": {
     "service_worker": "background.js"

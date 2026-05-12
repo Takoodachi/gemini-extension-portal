@@ -66,6 +66,10 @@
                             </div>
                         </div>
                     </div>
+                </div>
+
+                <div class="settings-group">
+                    <h3 class="settings-group-title">Functionality</h3>
                     <div class="settings-section">
                         <p class="settings-label" data-key="autoExpand">Auto-expand on long text</p>
                         <label class="switch">
@@ -87,6 +91,20 @@
                             <span class="slider"></span>
                         </label>
                     </div>
+                </div>
+
+                <div class="settings-group">
+                    <h3 class="settings-group-title">Position</h3>
+                    <div class="settings-section">
+                        <p class="settings-label" data-key="widgetPosition">Widget Corner</p>
+                        <div class="corner-picker" id="corner-picker">
+                            <button class="corner-btn" data-corner="top-left"     title="Top Left">↖</button>
+                            <button class="corner-btn" data-corner="top-right"    title="Top Right">↗</button>
+                            <button class="corner-btn" data-corner="bottom-left"  title="Bottom Left">↙</button>
+                            <button class="corner-btn" data-corner="bottom-right" title="Bottom Right (default)">↘</button>
+                        </div>
+                    </div>
+                    <button id="reset-position-button" class="settings-button" data-key="resetPosition">Reset to Default Position</button>
                 </div>
 
                 <div class="settings-group">

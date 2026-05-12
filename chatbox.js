@@ -104,7 +104,8 @@ const TRANSLATIONS = {
         chatCleared: "Chat history cleared!", ok: "OK",
         yes: "Yes", no: "No",
         copy: "Copy", copied: "Copied!",
-        ttsEnabled: "Text-to-Speech button", copyEnabled: "Copy answer button"
+        ttsEnabled: "Text-to-Speech button", copyEnabled: "Copy answer button",
+        widgetPosition: "Widget Corner", resetPosition: "Reset to Default Position"
     },
     vi: {
         geminiChat: "Trò chuyện Gemini", settings: "Cài đặt", send: "Gửi",
@@ -119,7 +120,8 @@ const TRANSLATIONS = {
         chatCleared: "Đã xóa lịch sử trò chuyện!", ok: "OK",
         yes: "Có", no: "Không",
         copy: "Sao chép", copied: "Đã sao chép!",
-        ttsEnabled: "Nút đọc văn bản", copyEnabled: "Nút sao chép câu trả lời"
+        ttsEnabled: "Nút đọc văn bản", copyEnabled: "Nút sao chép câu trả lời",
+        widgetPosition: "Góc widget", resetPosition: "Đặt lại vị trí mặc định"
     }
 };
 
@@ -312,8 +314,12 @@ class UIManager {
     }
 
     resizeTextarea() {
-        this.promptInput.style.height = '38px';
-        this.promptInput.style.height = `${Math.min(this.promptInput.scrollHeight, 120)}px`;
+        const el = this.promptInput;
+        const singleLineHeight = 34;
+        el.style.height = singleLineHeight + 'px';
+        if (el.scrollHeight > singleLineHeight) {
+            el.style.height = Math.min(el.scrollHeight, 120) + 'px';
+        }
     }
 
     handleImageFile(file) {
@@ -642,6 +648,8 @@ class SettingsManager {
         this.autoExpandCheckbox = document.getElementById('auto-expand-checkbox');
         this.ttsCheckbox = document.getElementById('tts-checkbox');
         this.copyCheckbox = document.getElementById('copy-checkbox');
+        this.cornerBtns = document.querySelectorAll('.corner-btn');
+        this.resetPositionBtn = document.getElementById('reset-position-button');
         this.bindEvents();
     }
 
@@ -668,6 +676,21 @@ class SettingsManager {
             });
             this.saveSettings();
         });
+        this.cornerBtns.forEach(btn => {
+            btn.addEventListener('click', () => {
+                const corner = btn.dataset.corner;
+                this._setCornerActive(corner);
+                window.parent.postMessage({ type: 'SET_CORNER_POSITION', corner }, '*');
+            });
+        });
+        this.resetPositionBtn.addEventListener('click', () => {
+            this._setCornerActive('bottom-right');
+            window.parent.postMessage({ type: 'SET_CORNER_POSITION', corner: 'bottom-right' }, '*');
+        });
+    }
+
+    _setCornerActive(corner) {
+        this.cornerBtns.forEach(b => b.classList.toggle('active', b.dataset.corner === corner));
     }
 
     applyLanguage(lang) {
@@ -707,7 +730,7 @@ class SettingsManager {
     }
 
     loadSettings() {
-        chrome.storage.local.get(['theme', 'size', 'language', 'autoExpand', 'ttsEnabled', 'copyEnabled', 'persistSettings'], result => {
+        chrome.storage.local.get(['theme', 'size', 'language', 'autoExpand', 'ttsEnabled', 'copyEnabled', 'persistSettings', 'cornerPosition'], result => {
             if (result.persistSettings) {
                 this.persistCheckbox.checked = true;
                 this.applyTheme(result.theme || 'dark');
@@ -729,6 +752,10 @@ class SettingsManager {
                 this.applyTheme('dark');
                 this.applySize('default');
                 this.applyLanguage('en');
+            }
+            // Restore corner picker state regardless of persistSettings (position always persists)
+            if (result.cornerPosition) {
+                this._setCornerActive(result.cornerPosition);
             }
             this.chatManager.addDateLine();
             this.chatManager.addMessage(TRANSLATIONS[this.state.currentLang].welcomeMessage, 'gemini');

@@ -1,4 +1,4 @@
-(function() {
+(function () {
     if (window.hasRunGeminiPortal) return;
     window.hasRunGeminiPortal = true;
 
@@ -9,6 +9,8 @@
     let chatHistory = [];
     let currentLanguage = 'en';
     let currentAbortController = null;
+    let currentPageContext = null;
+    let offsetX = 0, offsetY = 0;
 
     // Listener references for cleanup
     let handleDragMove = null;
@@ -24,6 +26,7 @@
     function enableFeature() {
         if (container) return;
 
+        currentPageContext = detectPageContext();
         container = document.createElement('div');
         container.id = 'gemini-chatbox-container';
         container.classList.add('bottom-right', 'gemini-entering');
@@ -53,7 +56,8 @@
         let isDragging = false;
         let hasDragged = false;
         let wasVisibleOnDragStart = false;
-        let offsetX = 0, offsetY = 0;
+        offsetX = 0;
+        offsetY = 0;
         let initialMouseX, initialMouseY;
 
         // Restore saved widget position
@@ -143,8 +147,8 @@
                 container.style.transition = 'transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1)';
                 container.style.transform = `translate(${offsetX}px, ${offsetY}px)`;
 
-                // Persist position across page loads
-                chrome.storage.local.set({ widgetPosition: { x: offsetX, y: offsetY } });
+                // Persist position; clear corner preset since user dragged to a custom spot
+                chrome.storage.local.set({ widgetPosition: { x: offsetX, y: offsetY }, cornerPosition: null });
 
                 setTimeout(() => {
                     updateQuadrantClass();
@@ -188,10 +192,10 @@
                 chatIframe.style.width = (message.size === 'large') ? '700px' : '350px';
             } else if (message.type === 'THEME_CHANGED') {
                 if (message.theme === 'light') {
-                    floatingButton.style.backgroundColor = '#FFFFFF';
+                    floatingButton.style.backgroundColor = '#f7f3ef';
                     floatingButtonIcon.src = chrome.runtime.getURL('chat-icon-light.png');
                 } else {
-                    floatingButton.style.backgroundColor = '#121212';
+                    floatingButton.style.backgroundColor = '#0a0a0a';
                     floatingButtonIcon.src = chrome.runtime.getURL('chat-icon-dark.png');
                 }
             } else if (message.type === 'CLEAR_CHAT_HISTORY') {
@@ -201,20 +205,22 @@
                 toggleChatbox();
             } else if (message.type === 'SUMMARIZE_PAGE') {
                 if (!chatIframe.classList.contains('gemini-iframe-visible')) toggleChatbox();
-                
+
                 chrome.storage.local.get(["disabledDataDomains"], (data) => {
                     const disabledDataDomains = data.disabledDataDomains || [];
                     if (disabledDataDomains.includes(window.location.hostname)) {
                         sendError("Data reading is disabled for this website. You can enable it in the extension popup menu.");
                         return;
                     }
-                    
+
                     const pageText = document.body.innerText.slice(0, 15000);
                     sendToIframe({ type: 'ADD_USER_MESSAGE', text: 'Summarize this page' });
                     handleGeminiPrompt({ text: `Please summarize the content of this page:\n\n${pageText}` });
                 });
             } else if (message.type === 'STOP_GENERATION') {
                 if (currentAbortController) currentAbortController.abort();
+            } else if (message.type === 'SET_CORNER_POSITION') {
+                setCornerPosition(message.corner);
             } else if (message.type === 'GEMINI_PROMPT') {
                 handleGeminiPrompt(message);
             }
@@ -274,6 +280,25 @@
         return { x: snapX, y: snapY };
     }
 
+    function setCornerPosition(corner) {
+        if (!container) return;
+        const vw = window.innerWidth;
+        const vh = window.innerHeight;
+        const isLeft = corner.includes('left');
+        const isTop = corner.includes('top');
+        // The container anchors at bottom:20px right:20px with a 50px button.
+        // Default (bottom-right) offset is (0,0). Other corners shift from there.
+        offsetX = isLeft ? -(vw - 90) : 0;
+        offsetY = isTop ? -(vh - 90) : 0;
+        container.style.transition = 'transform 0.4s cubic-bezier(0.34, 1.56, 0.64, 1)';
+        container.style.transform = `translate(${offsetX}px, ${offsetY}px)`;
+        setTimeout(() => {
+            updateQuadrantClass();
+            container.style.transition = 'transform 0.2s ease-out';
+        }, 400);
+        chrome.storage.local.set({ widgetPosition: { x: offsetX, y: offsetY }, cornerPosition: corner });
+    }
+
     function toggleChatbox() {
         if (chatIframe) chatIframe.classList.toggle('gemini-iframe-visible');
     }
@@ -303,12 +328,7 @@
                 const { functionCall } = result;
                 chatHistory.push({ role: "model", parts: [{ functionCall }] });
 
-                let toolOutput;
-                if (functionCall.name === 'googleSearch') {
-                    toolOutput = await executeGoogleSearch(functionCall.args.query);
-                } else {
-                    toolOutput = { error: `Unknown function: ${functionCall.name}` };
-                }
+                const toolOutput = await executeToolCall(functionCall);
 
                 currentAbortController = new AbortController();
                 const finalResult = await streamGeminiRequest(
@@ -324,7 +344,7 @@
             } else if (result.text) {
                 chatHistory.push({ role: "model", parts: [{ text: result.text }] });
                 chrome.storage.session.set({ chatHistory });
-            } else if (!result.functionCall) {
+            } else {
                 sendError("The model did not return a response.");
             }
         } catch (error) {
@@ -340,7 +360,7 @@
     }
 
     async function streamGeminiRequest(history, toolOutputs, signal) {
-        const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:streamGenerateContent?key=${GEMINI_API_KEY}&alt=sse`;
+        const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-lite:streamGenerateContent?key=${GEMINI_API_KEY}&alt=sse`;
         const payload = buildGeminiPayload(history, toolOutputs);
 
         const response = await fetch(url, {
@@ -359,8 +379,9 @@
         const decoder = new TextDecoder();
         let buffer = '';
         let accumulatedText = '';
-        let functionCall = null;
+
         let groundingMetadata = null;
+        let functionCall = null;
         let streamStarted = false;
 
         try {
@@ -418,65 +439,320 @@
         });
         const langInstruction = currentLanguage === 'vi' ? 'Please respond in Vietnamese.' : 'Please respond in English.';
 
-        const payload = {
-            system_instruction: {
-                parts: [{ text: `System context: The current date and time is ${formattedDate}. ${langInstruction}` }]
-            },
-            tools: [{
-                functionDeclarations: [{
-                    name: "googleSearch",
-                    description: "Search Google for current information.",
-                    parameters: {
-                        type: "object",
-                        properties: { query: { type: "string", description: "The search query." } },
-                        required: ["query"]
-                    }
-                }]
-            }],
-            contents: [...history]
-        };
+        let systemText = `You are a helpful AI assistant embedded in a browser extension. The current date and time is ${formattedDate}. ${langInstruction} When you have access to real-time data from a tool, always use it and cite the source briefly. Prefer specialized tools (weather, news, stocks, Wikipedia) over generic web search for queries they can handle.`;
 
+        if (currentPageContext) {
+            const ctx = currentPageContext;
+            if (ctx.type === 'youtube' && ctx.title) {
+                systemText += ` The user is watching a YouTube video: "${ctx.title}"${ctx.channel ? ` by ${ctx.channel}` : ''}.${ctx.description ? ` Description: ${ctx.description}` : ''}`;
+            } else if (ctx.type === 'github' && ctx.repo) {
+                systemText += ` The user is viewing GitHub repo: ${ctx.repo}.${ctx.about ? ` About: ${ctx.about}.` : ''}${ctx.readme ? ` README: ${ctx.readme}` : ''}`;
+            } else if (ctx.type === 'reddit' && ctx.title) {
+                systemText += ` The user is on Reddit${ctx.subreddit ? ` (r/${ctx.subreddit})` : ''}: "${ctx.title}".`;
+            } else if (ctx.type === 'stackoverflow' && ctx.question) {
+                systemText += ` The user is on Stack Overflow: "${ctx.question}".`;
+            } else if (ctx.type === 'wikipedia' && ctx.title) {
+                systemText += ` The user is reading the Wikipedia article: "${ctx.title}".`;
+            } else if (ctx.type === 'article' && ctx.title) {
+                systemText += ` The user is reading an article: "${ctx.title}".`;
+            }
+        }
+
+        const contents = [...history];
         if (toolOutputs) {
-            payload.contents.push({
-                role: "function",
+            contents.push({
+                role: "user",
                 parts: [{ functionResponse: { name: toolOutputs.name, response: toolOutputs.response } }]
             });
         }
 
-        return payload;
+        return {
+            system_instruction: { parts: [{ text: systemText }] },
+            tools: [
+                { googleSearch: {} },
+                {
+                    functionDeclarations: [
+                        {
+                            name: "getWeather",
+                            description: "Get current weather and multi-day forecast for any location. Use for all weather, temperature, precipitation, or forecast questions.",
+                            parameters: {
+                                type: "OBJECT",
+                                properties: {
+                                    location: { type: "STRING", description: "City name or location (e.g. 'London', 'New York, NY')" },
+                                    unit: { type: "STRING", description: "Temperature unit: 'fahrenheit' or 'celsius'", enum: ["fahrenheit", "celsius"] }
+                                },
+                                required: ["location"]
+                            }
+                        },
+                        {
+                            name: "convertCurrency",
+                            description: "Convert an amount between any two currencies using live exchange rates. Use for currency conversion or exchange rate questions.",
+                            parameters: {
+                                type: "OBJECT",
+                                properties: {
+                                    amount: { type: "NUMBER", description: "The amount to convert" },
+                                    from_currency: { type: "STRING", description: "Source currency code (e.g. 'USD', 'EUR', 'JPY')" },
+                                    to_currency: { type: "STRING", description: "Target currency code (e.g. 'USD', 'EUR', 'JPY')" }
+                                },
+                                required: ["amount", "from_currency", "to_currency"]
+                            }
+                        },
+                        {
+                            name: "lookupWikipedia",
+                            description: "Look up encyclopedic information about a person, place, concept, or event from Wikipedia. Use for factual or background knowledge questions.",
+                            parameters: {
+                                type: "OBJECT",
+                                properties: {
+                                    query: { type: "STRING", description: "The topic, person, or concept to look up" }
+                                },
+                                required: ["query"]
+                            }
+                        },
+                        {
+                            name: "getNewsHeadlines",
+                            description: "Fetch the latest news articles about any topic. Use for questions about current events, recent developments, or news about a specific subject.",
+                            parameters: {
+                                type: "OBJECT",
+                                properties: {
+                                    topic: { type: "STRING", description: "The news topic or keyword to search for" },
+                                    count: { type: "INTEGER", description: "Number of articles to return (1-10, default 5)" }
+                                },
+                                required: ["topic"]
+                            }
+                        },
+                        {
+                            name: "getStockPrice",
+                            description: "Get the current stock price and market data for a publicly traded company. Use for questions about stock prices, market performance, or financial metrics.",
+                            parameters: {
+                                type: "OBJECT",
+                                properties: {
+                                    symbol: { type: "STRING", description: "Stock ticker symbol (e.g. 'AAPL', 'GOOGL', 'TSLA', 'MSFT')" }
+                                },
+                                required: ["symbol"]
+                            }
+                        }
+                    ]
+                }
+            ],
+            contents
+        };
     }
 
-    async function executeGoogleSearch(query) {
-        const url = new URL("https://www.googleapis.com/customsearch/v1");
-        url.searchParams.append('q', query);
-        url.searchParams.append('key', GOOGLE_SEARCH_API_KEY);
-        url.searchParams.append('cx', CUSTOM_SEARCH_ENGINE_ID);
+    function detectPageContext() {
+        const hostname = window.location.hostname;
+        const path = window.location.pathname;
+
+        if (hostname.includes('youtube.com') && path.includes('/watch')) {
+            const title = document.querySelector('h1.ytd-watch-metadata yt-formatted-string')?.textContent?.trim()
+                       || document.title.replace(' - YouTube', '').trim();
+            const channel = document.querySelector('ytd-channel-name yt-formatted-string a')?.textContent?.trim()
+                         || document.querySelector('#channel-name a')?.textContent?.trim();
+            const description = document.querySelector('#description-inner')?.textContent?.trim()?.slice(0, 400);
+            return { type: 'youtube', title, channel, description };
+        }
+
+        if (hostname.includes('github.com')) {
+            const parts = path.split('/').filter(Boolean);
+            if (parts.length >= 2) {
+                const repo = `${parts[0]}/${parts[1]}`;
+                const about = document.querySelector('p.f4.my-3')?.textContent?.trim()
+                           || document.querySelector('[data-pjax="#repo-content-pjax-container"] .BorderGrid-cell p')?.textContent?.trim();
+                const readme = document.querySelector('article.markdown-body')?.textContent?.trim()?.slice(0, 800);
+                return { type: 'github', repo, about, readme };
+            }
+        }
+
+        if (hostname.includes('reddit.com')) {
+            const title = document.querySelector('h1[id^="post-title"]')?.textContent?.trim()
+                       || document.querySelector('h1')?.textContent?.trim()
+                       || document.title.split(' : ')[0].trim();
+            const subreddit = path.split('/')[2];
+            return { type: 'reddit', title, subreddit };
+        }
+
+        if (hostname.includes('stackoverflow.com') || hostname.includes('stackexchange.com')) {
+            const question = document.querySelector('h1[itemprop="name"] a')?.textContent?.trim()
+                          || document.querySelector('h1.fs-headline1')?.textContent?.trim();
+            return { type: 'stackoverflow', question };
+        }
+
+        if (hostname.includes('wikipedia.org')) {
+            const title = document.querySelector('#firstHeading')?.textContent?.trim();
+            return { type: 'wikipedia', title };
+        }
+
+        if (document.querySelector('article') || document.querySelector('[role="article"]')) {
+            const title = document.querySelector('h1')?.textContent?.trim();
+            return { type: 'article', title };
+        }
+
+        return { type: 'general' };
+    }
+
+    function weatherCodeToCondition(code) {
+        const map = {
+            0: 'Clear sky', 1: 'Mainly clear', 2: 'Partly cloudy', 3: 'Overcast',
+            45: 'Foggy', 48: 'Depositing rime fog',
+            51: 'Light drizzle', 53: 'Moderate drizzle', 55: 'Dense drizzle',
+            61: 'Slight rain', 63: 'Moderate rain', 65: 'Heavy rain',
+            71: 'Slight snow', 73: 'Moderate snow', 75: 'Heavy snow', 77: 'Snow grains',
+            80: 'Slight showers', 81: 'Moderate showers', 82: 'Violent showers',
+            85: 'Slight snow showers', 86: 'Heavy snow showers',
+            95: 'Thunderstorm', 96: 'Thunderstorm with slight hail', 99: 'Thunderstorm with heavy hail'
+        };
+        return map[code] || 'Unknown';
+    }
+
+    async function executeGetWeather(location, unit = 'fahrenheit') {
+        const geoRes = await fetch(`https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(location)}&count=1&language=en&format=json`);
+        const geoData = await geoRes.json();
+        if (!geoData.results?.length) return { error: `Location not found: ${location}` };
+
+        const { latitude, longitude, name, country, admin1 } = geoData.results[0];
+        const displayName = [name, admin1, country].filter(Boolean).join(', ');
+        const unitParam = unit === 'celsius' ? 'celsius' : 'fahrenheit';
+        const deg = unit === 'celsius' ? '°C' : '°F';
+
+        const weatherRes = await fetch(
+            `https://api.open-meteo.com/v1/forecast?latitude=${latitude}&longitude=${longitude}` +
+            `&current=temperature_2m,apparent_temperature,relative_humidity_2m,wind_speed_10m,wind_direction_10m,weather_code,precipitation,cloud_cover` +
+            `&daily=temperature_2m_max,temperature_2m_min,weather_code,precipitation_sum,precipitation_probability_max,wind_speed_10m_max` +
+            `&temperature_unit=${unitParam}&wind_speed_unit=mph&timezone=auto&forecast_days=4`
+        );
+        const w = await weatherRes.json();
+        const c = w.current;
+
+        return {
+            location: displayName,
+            current: {
+                condition: weatherCodeToCondition(c.weather_code),
+                temperature: `${c.temperature_2m}${deg}`,
+                feels_like: `${c.apparent_temperature}${deg}`,
+                humidity: `${c.relative_humidity_2m}%`,
+                wind: `${c.wind_speed_10m} mph`,
+                precipitation: `${c.precipitation} mm`,
+                cloud_cover: `${c.cloud_cover}%`
+            },
+            forecast: w.daily.time.map((date, i) => ({
+                date,
+                condition: weatherCodeToCondition(w.daily.weather_code[i]),
+                high: `${w.daily.temperature_2m_max[i]}${deg}`,
+                low: `${w.daily.temperature_2m_min[i]}${deg}`,
+                rain_chance: `${w.daily.precipitation_probability_max[i]}%`,
+                precipitation: `${w.daily.precipitation_sum[i]} mm`,
+                max_wind: `${w.daily.wind_speed_10m_max[i]} mph`
+            }))
+        };
+    }
+
+    async function executeConvertCurrency(amount, from_currency, to_currency) {
+        const from = from_currency.toLowerCase();
+        const to = to_currency.toLowerCase();
+        const res = await fetch(`https://cdn.jsdelivr.net/npm/@fawazahmed0/currency-api@latest/v1/currencies/${from}.json`);
+        const data = await res.json();
+        const rate = data[from]?.[to];
+        if (!rate) return { error: `No exchange rate found for ${from_currency.toUpperCase()} → ${to_currency.toUpperCase()}` };
+        return {
+            from: `${amount} ${from_currency.toUpperCase()}`,
+            to: `${(amount * rate).toFixed(4)} ${to_currency.toUpperCase()}`,
+            rate: rate,
+            rate_display: `1 ${from_currency.toUpperCase()} = ${rate} ${to_currency.toUpperCase()}`,
+            date: data.date
+        };
+    }
+
+    async function executeLookupWikipedia(query) {
+        const searchRes = await fetch(`https://en.wikipedia.org/w/api.php?action=query&list=search&srsearch=${encodeURIComponent(query)}&format=json&origin=*&srlimit=1`);
+        const searchData = await searchRes.json();
+        if (!searchData.query.search?.length) return { error: `No Wikipedia article found for: ${query}` };
+
+        const title = searchData.query.search[0].title;
+        const summaryRes = await fetch(`https://en.wikipedia.org/api/rest_v1/page/summary/${encodeURIComponent(title)}`);
+        const s = await summaryRes.json();
+        return {
+            title: s.title,
+            description: s.description || '',
+            summary: s.extract,
+            url: s.content_urls?.desktop?.page || `https://en.wikipedia.org/wiki/${encodeURIComponent(title)}`
+        };
+    }
+
+    async function executeGetNewsHeadlines(topic, count = 5) {
+        const safeCount = Math.min(Math.max(parseInt(count) || 5, 1), 10);
+        const res = await fetch(`https://gnews.io/api/v4/search?q=${encodeURIComponent(topic)}&lang=en&max=${safeCount}&token=${GNEWS_API_KEY}`);
+        const data = await res.json();
+        if (!data.articles?.length) return { error: `No news found for: ${topic}` };
+        return {
+            topic,
+            total_found: data.totalArticles,
+            articles: data.articles.map(a => ({
+                title: a.title,
+                source: a.source.name,
+                published: a.publishedAt,
+                description: a.description,
+                url: a.url
+            }))
+        };
+    }
+
+    async function executeGetStockPrice(symbol) {
+        const res = await fetch(`https://www.alphavantage.co/query?function=GLOBAL_QUOTE&symbol=${encodeURIComponent(symbol.toUpperCase())}&apikey=${ALPHA_VANTAGE_API_KEY}`);
+        const data = await res.json();
+        const q = data['Global Quote'];
+        if (!q?.['05. price']) return { error: `Stock not found: ${symbol.toUpperCase()}. Verify the ticker symbol.` };
+        const price = parseFloat(q['05. price']);
+        const change = parseFloat(q['09. change']);
+        return {
+            symbol: q['01. symbol'],
+            price: `$${price.toFixed(2)}`,
+            change: `${change >= 0 ? '+' : ''}${change.toFixed(2)}`,
+            change_percent: q['10. change percent'],
+            high: `$${parseFloat(q['03. high']).toFixed(2)}`,
+            low: `$${parseFloat(q['04. low']).toFixed(2)}`,
+            volume: parseInt(q['06. volume']).toLocaleString(),
+            previous_close: `$${parseFloat(q['08. previous close']).toFixed(2)}`,
+            last_trading_day: q['07. latest trading day']
+        };
+    }
+
+    async function executeToolCall(functionCall) {
         try {
-            const response = await fetch(url.toString());
-            const data = await response.json();
-            const results = (data.items || []).map(item => ({ title: item.title, snippet: item.snippet, link: item.link }));
-            return { results: results.length ? results : [{ snippet: "No results found." }] };
-        } catch (error) {
-            return { error: error.message };
+            const { name, args } = functionCall;
+            switch (name) {
+                case 'getWeather':
+                    return await executeGetWeather(args.location, args.unit);
+                case 'convertCurrency':
+                    return await executeConvertCurrency(args.amount, args.from_currency, args.to_currency);
+                case 'lookupWikipedia':
+                    return await executeLookupWikipedia(args.query);
+                case 'getNewsHeadlines':
+                    return await executeGetNewsHeadlines(args.topic, args.count);
+                case 'getStockPrice':
+                    return await executeGetStockPrice(args.symbol);
+                default:
+                    return { error: `Unknown tool: ${name}` };
+            }
+        } catch (err) {
+            return { error: `Tool execution failed: ${err.message}` };
         }
     }
 
     const CONTEXT_MENU_PREFIXES = {
-        "gemini-summarize":    "Summarize this:\n\n",
-        "gemini-explain":      "Explain this:\n\n",
-        "gemini-fix-grammar":  "Fix the grammar and spelling of this text:\n\n",
-        "gemini-rephrase":     "Rephrase and rewrite this text:\n\n",
-        "gemini-shorten":      "Make this text shorter and more concise:\n\n",
+        "gemini-summarize": "Summarize this:\n\n",
+        "gemini-explain": "Explain this:\n\n",
+        "gemini-fix-grammar": "Fix the grammar and spelling of this text:\n\n",
+        "gemini-rephrase": "Rephrase and rewrite this text:\n\n",
+        "gemini-shorten": "Make this text shorter and more concise:\n\n",
         "gemini-translate-vi": "Translate this to Vietnamese:\n\n",
         "gemini-translate-en": "Translate this to English:\n\n"
     };
 
     const CONTEXT_MENU_LABELS = {
-        "gemini-summarize":    "Summarize",
-        "gemini-explain":      "Explain",
-        "gemini-fix-grammar":  "Fix grammar",
-        "gemini-rephrase":     "Rephrase",
-        "gemini-shorten":      "Make shorter",
+        "gemini-summarize": "Summarize",
+        "gemini-explain": "Explain",
+        "gemini-fix-grammar": "Fix grammar",
+        "gemini-rephrase": "Rephrase",
+        "gemini-shorten": "Make shorter",
         "gemini-translate-vi": "Translate to Vietnamese",
         "gemini-translate-en": "Translate to English"
     };
@@ -502,7 +778,7 @@
         const isGlobalEnabled = data.globalEnabled !== false && data.isEnabled !== false;
         const disabledDomains = data.disabledDomains || [];
         const isDomainDisabled = disabledDomains.includes(window.location.hostname);
-        
+
         if (isGlobalEnabled && !isDomainDisabled) {
             enableFeature();
         }

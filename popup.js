@@ -1,4 +1,14 @@
 document.addEventListener('DOMContentLoaded', async () => {
+    // Match the extension's theme setting
+    chrome.storage.local.get(['theme'], (data) => {
+        if (data.theme === 'light') document.body.classList.add('light-theme');
+    });
+    chrome.storage.onChanged.addListener((changes) => {
+        if (changes.theme) {
+            document.body.classList.toggle('light-theme', changes.theme.newValue === 'light');
+        }
+    });
+
     const domainValue = document.getElementById('current-domain');
     const domainInfo = document.querySelector('.domain-info');
     const statusBadge = document.getElementById('status-badge');

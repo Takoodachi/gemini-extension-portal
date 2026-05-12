@@ -1,1 +1,4 @@
 CLAUDE.md
+generate_icons.py
+.claude/settings.local.json
+env.js

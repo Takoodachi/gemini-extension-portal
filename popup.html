@@ -1,0 +1,58 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <link rel="stylesheet" href="popup.css">
+</head>
+<body>
+    <div id="popup-container">
+        <div class="popup-header">
+            <img src="icon-32x32.png" alt="Gemini Portal" class="logo">
+            <h2>Gemini Portal</h2>
+        </div>
+        
+        <div class="domain-info">
+            <span class="domain-label">Current Site:</span>
+            <span id="current-domain" class="domain-value">Loading...</span>
+        </div>
+
+        <div class="settings-group">
+            <div class="setting-item">
+                <div class="setting-text">
+                    <span class="setting-title">Extension Enabled</span>
+                    <span class="setting-desc">Show chatbox on this website</span>
+                </div>
+                <label class="switch">
+                    <input type="checkbox" id="toggle-domain" checked>
+                    <span class="slider"></span>
+                </label>
+            </div>
+
+            <div class="setting-item">
+                <div class="setting-text">
+                    <span class="setting-title">Allow Data Reading</span>
+                    <span class="setting-desc">Permit page summarization</span>
+                </div>
+                <label class="switch">
+                    <input type="checkbox" id="toggle-data" checked>
+                    <span class="slider"></span>
+                </label>
+            </div>
+        </div>
+
+        <div class="settings-group global-group">
+            <div class="setting-item">
+                <div class="setting-text">
+                    <span class="setting-title">Global Master Switch</span>
+                    <span class="setting-desc">Turn extension on/off everywhere</span>
+                </div>
+                <label class="switch">
+                    <input type="checkbox" id="toggle-global" checked>
+                    <span class="slider"></span>
+                </label>
+            </div>
+        </div>
+    </div>
+    <script src="popup.js"></script>
+</body>
+</html>

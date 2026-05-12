@@ -200,9 +200,18 @@
                 toggleChatbox();
             } else if (message.type === 'SUMMARIZE_PAGE') {
                 if (!chatIframe.classList.contains('gemini-iframe-visible')) toggleChatbox();
-                const pageText = document.body.innerText.slice(0, 15000);
-                sendToIframe({ type: 'ADD_USER_MESSAGE', text: 'Summarize this page' });
-                handleGeminiPrompt({ text: `Please summarize the content of this page:\n\n${pageText}` });
+                
+                chrome.storage.local.get(["disabledDataDomains"], (data) => {
+                    const disabledDataDomains = data.disabledDataDomains || [];
+                    if (disabledDataDomains.includes(window.location.hostname)) {
+                        sendError("Data reading is disabled for this website. You can enable it in the extension popup menu.");
+                        return;
+                    }
+                    
+                    const pageText = document.body.innerText.slice(0, 15000);
+                    sendToIframe({ type: 'ADD_USER_MESSAGE', text: 'Summarize this page' });
+                    handleGeminiPrompt({ text: `Please summarize the content of this page:\n\n${pageText}` });
+                });
             } else if (message.type === 'STOP_GENERATION') {
                 if (currentAbortController) currentAbortController.abort();
             } else if (message.type === 'GEMINI_PROMPT') {
@@ -482,8 +491,15 @@
         }
     });
 
-    chrome.storage.local.get("isEnabled", (data) => {
-        if (data.isEnabled === undefined || data.isEnabled === true) enableFeature();
+    chrome.storage.local.get(["globalEnabled", "disabledDomains", "isEnabled"], (data) => {
+        // Backwards compatibility with isEnabled during transition
+        const isGlobalEnabled = data.globalEnabled !== false && data.isEnabled !== false;
+        const disabledDomains = data.disabledDomains || [];
+        const isDomainDisabled = disabledDomains.includes(window.location.hostname);
+        
+        if (isGlobalEnabled && !isDomainDisabled) {
+            enableFeature();
+        }
     });
 
 })();
